@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/utils/supabase/server";
+
+
 
 function supabaseServer() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
