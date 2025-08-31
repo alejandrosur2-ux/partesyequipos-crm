@@ -1,15 +1,12 @@
-import { NextResponse } from "next/server";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export async function GET() {
+export default function handler(_req: NextApiRequest, res: NextApiResponse) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-  return NextResponse.json({
+  res.status(200).json({
     ok: Boolean(url && key),
     url_present: Boolean(url),
     key_present: Boolean(key),
-    marker: "env-check-app-router"
+    marker: "env-check-pages-router"
   });
 }
