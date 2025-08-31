@@ -3,9 +3,7 @@ export const revalidate = 0;
 
 import { supabaseServer } from "@/utils/supabase/server";
 
-type Kpis = { machines: number };
-
-async function getKpis(): Promise<Kpis> {
+async function getKpis() {
   const sb = supabaseServer();
   const { count } = await sb.from("machines").select("id", { head: true, count: "exact" });
   return { machines: count ?? 0 };
@@ -23,10 +21,6 @@ export default async function DashboardPage() {
           <div className="text-3xl font-bold">{kpis.machines}</div>
         </div>
       </div>
-
-      <p className="text-sm text-zinc-500">
-        (Esto es un tablero mínimo. Luego añadimos más KPIs y gráficas.)
-      </p>
     </main>
   );
 }

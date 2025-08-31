@@ -10,3 +10,4 @@ export default function Home() {
     </main>
   );
 }
+<li><a className="text-blue-400 underline" href="/dashboard">Dashboard</a></li>
