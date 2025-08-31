@@ -1,5 +1,11 @@
 import { supabaseServer } from "@/utils/supabase/server";
 
+type DbLine = {
+  date: string;
+  description: string | null;
+  debit: number | null;
+  credit: number | null;
+};
 
 type Line = {
   date: string;
@@ -25,39 +31,65 @@ export default async function StatementPage({
   const start = searchParams?.start || toISODate(dStart);
   const end   = searchParams?.end   || toISODate(today);
 
+  // Sin cliente: solo formulario
   if (!clientId) {
     return (
       <main className="p-6 space-y-4">
         <h1 className="text-2xl font-semibold">Estado de cuenta por cliente</h1>
         <FilterForm defaultClient="" defaultStart={start} defaultEnd={end} />
-        <p className="text-sm text-gray-500">Selecciona un cliente para ver su estado de cuenta.</p>
+        <p className="text-sm text-gray-500">Ingresa el ID del cliente y un rango de fechas.</p>
       </main>
     );
   }
 
   const supabase = supabaseServer();
 
-  // Buscar cliente
-  const { data: client } = await supabase
+  // Cargar cliente (ajusta el nombre de la tabla si usas otra)
+  const { data: client, error: cErr } = await supabase
     .from("crm_clients")
     .select("id, name")
     .eq("id", clientId)
     .maybeSingle();
 
-  if (!client) return <div className="p-6">Cliente no encontrado.</div>;
+  if (cErr) return <div className="p-6 text-red-600">Error: {cErr.message}</div>;
+  if (!client) return (
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Estado de cuenta por cliente</h1>
+      <FilterForm defaultClient={clientId} defaultStart={start} defaultEnd={end} />
+      <div className="text-red-600">No se encontró el cliente {clientId}.</div>
+    </main>
+  );
 
-  // Consultar movimientos (rentas, pagos, etc.)
-  const { data: lines } = await supabase
-    .from("v_client_statement_lines") // 👈 debes crear esta vista en Supabase
+  // Movimientos por cliente desde una vista unificada
+  // Nota: crea en tu DB la vista v_client_statement_lines con (client_id, date, description, debit, credit)
+  const { data: lines, error: lErr } = await supabase
+    .from("v_client_statement_lines")
     .select("date, description, debit, credit")
-    .eq("client_id", clientId)
+    .eq("client_id", client.id)
     .gte("date", start)
     .lte("date", end)
     .order("date", { ascending: true });
 
-  const rows: Line[] = (lines ?? []).map((r: any) => ({
+  if (lErr) {
+    // Si aún no has creado la vista, mostramos mensaje claro
+    return (
+      <main className="p-6 space-y-4">
+        <h1 className="text-2xl font-semibold">Estado de cuenta — {client.name}</h1>
+        <FilterForm defaultClient={clientId} defaultStart={start} defaultEnd={end} />
+        <div className="text-red-600">
+          {lErr.message.includes("v_client_statement_lines")
+            ? "Falta crear la vista v_client_statement_lines en Supabase (puedo pasarte el SQL)."
+            : `Error: ${lErr.message}`
+          }
+        </div>
+      </main>
+    );
+  }
+
+  const raw: DbLine[] = (lines ?? []) as DbLine[];
+  const rows: Line[] = raw.map((r) => ({
     date: r.date,
-    description: r.description,
+    description: r.description ?? null,
     debit: Number(r.debit ?? 0),
     credit: Number(r.credit ?? 0),
     balance: 0,
@@ -113,13 +145,9 @@ export default async function StatementPage({
 }
 
 function FilterForm({
-  defaultClient,
-  defaultStart,
-  defaultEnd,
+  defaultClient, defaultStart, defaultEnd,
 }: {
-  defaultClient: string;
-  defaultStart: string;
-  defaultEnd: string;
+  defaultClient: string; defaultStart: string; defaultEnd: string;
 }) {
   return (
     <form className="grid gap-3 md:grid-cols-4" action="/reports/statement" method="get">
