@@ -1,26 +1,24 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-import { supabaseServer } from "@/utils/supabase/server";
-
-async function getKpis() {
-  const sb = supabaseServer();
-  const { count } = await sb.from("machines").select("id", { head: true, count: "exact" });
-  return { machines: count ?? 0 };
-}
-
-export default async function DashboardPage() {
-  const kpis = await getKpis();
-
+export default function Home() {
   return (
-    <main className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="rounded-2xl border p-4 bg-zinc-900/40">
-          <div className="text-sm text-zinc-400">Máquinas</div>
-          <div className="text-3xl font-bold">{kpis.machines}</div>
-        </div>
-      </div>
+    <main className="p-6">
+      <h1 className="text-2xl font-semibold mb-4">Partes y Equipos — Demo</h1>
+      <ul className="list-disc pl-6 space-y-2">
+        <li>
+          <a className="text-blue-400 underline" href="/dashboard">
+            Ir al Dashboard
+          </a>
+        </li>
+        <li>
+          <a className="text-blue-400 underline" href="/reports/machine-statement?code=EXC-001">
+            Estado por máquina
+          </a>
+        </li>
+        <li>
+          <a className="text-blue-400 underline" href="/reports/statement">
+            Estado por cliente
+          </a>
+        </li>
+      </ul>
     </main>
   );
 }
