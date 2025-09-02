@@ -40,18 +40,15 @@ export default async function Page({
   let rowsUI: RowUI[] = [];
 
   if (code) {
-    // 1) machines para mapear id -> code
     const { data: machines, error: mErr } = await sb.from('machines').select('id, code');
     if (mErr) throw new Error(mErr.message);
     const codeById = new Map<string, string>(((machines ?? []) as Machine[]).map((m) => [m.id, m.code]));
 
-    // 2) vista por fechas
     const { data: vrows, error: vErr } = await sb
       .from('v_machine_statement_lines')
       .select('machine_id, date, source, description, debit, credit')
       .gte('date', from)
       .lte('date', to);
-
     if (vErr) throw new Error(vErr.message);
 
     const filtered: VRow[] = ((vrows ?? []) as VRow[]).filter((r) => codeById.get(r.machine_id) === code);
@@ -66,12 +63,10 @@ export default async function Page({
     }));
   }
 
-  // === Totales
   const total_cargos = rowsUI.reduce((a, r) => a + numeric(r.debit), 0);
   const total_abonos = rowsUI.reduce((a, r) => a + numeric(r.credit), 0);
   const saldo_total = total_cargos - total_abonos;
 
-  // === Saldo corrido por línea
   let running = 0;
   const rowsWithBalance: RowWithBalance[] = rowsUI.map((r) => {
     const debit = numeric(r.debit);
@@ -103,18 +98,14 @@ export default async function Page({
       {code ? (
         <>
           {/* Resumen y export */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between text-sm">
             <div>
               Máquina: <b>{code}</b> · Registros: {rowsWithBalance.length} · Cargos:{' '}
               <b>Q{total_cargos.toFixed(2)}</b> · Abonos: <b>Q{total_abonos.toFixed(2)}</b> · Saldo:{' '}
               <b>Q{saldo_total.toFixed(2)}</b>
             </div>
             <div className="flex gap-3">
-              <Link
-                href={`/api/export?entity=machine-statement&${qs}`}
-                className="underline"
-                prefetch={false}
-              >
+              <Link href={`/api/export?entity=machine-statement&${qs}`} className="underline" prefetch={false}>
                 Exportar CSV
               </Link>
               <Link
@@ -124,12 +115,18 @@ export default async function Page({
               >
                 Exportar XLSX
               </Link>
+              <Link href={`/reports/machine-statement/print?${qs}`} className="underline" prefetch={false}>
+                Vista de impresión
+              </Link>
+              {/* NUEVO: abre /print con auto=1 y lanza el diálogo de impresión */}
               <Link
-                href={`/reports/machine-statement/print?${qs}`}
-                className="underline"
+                href={`/reports/machine-statement/print?${qs}&auto=1`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl bg-black text-white px-3 py-1"
                 prefetch={false}
               >
-                Vista de impresión
+                Imprimir PDF
               </Link>
             </div>
           </div>
