@@ -9,7 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.56.0",
+    "recharts": "^2.12.7"
+    }
+  }
+"@supabase/supabase-js": "^2.56.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.18",
     "next": "15.5.0",
