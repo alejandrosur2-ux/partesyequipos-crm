@@ -28,7 +28,6 @@ const numeric = (v: unknown) => Number(v ?? 0);
 const fmtQ = (n: number) =>
   `Q ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// ⬇️ DEFAULT EXPORT (necesario para Next.js)
 export default async function Page({
   searchParams,
 }: {
@@ -40,13 +39,13 @@ export default async function Page({
 
   const sb = supabaseServer();
 
-  // 1) id -> code
+  // 1) máquinas
   const { data: machines } = await sb.from('machines').select('id, code');
   const codeById = new Map<string, string>(
     ((machines ?? []) as Machine[]).map((m) => [m.id, m.code]),
   );
 
-  // 2) líneas
+  // 2) movimientos
   const { data: vrows } = await sb
     .from('v_machine_statement_lines')
     .select('machine_id, date, source, description, debit, credit')
@@ -66,7 +65,7 @@ export default async function Page({
     credit: r.credit,
   }));
 
-  // 3) totales + saldo corrido
+  // 3) totales
   const total_cargos = rowsUI.reduce((a, r) => a + numeric(r.debit), 0);
   const total_abonos = rowsUI.reduce((a, r) => a + numeric(r.credit), 0);
   const saldo_total = total_cargos - total_abonos;
@@ -78,13 +77,12 @@ export default async function Page({
     return { ...r, amount, balance: running };
   });
 
-  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || '';
   const todayStr = new Date().toISOString().slice(0, 10);
   const qs = new URLSearchParams({ code, from, to }).toString();
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* barra superior (no se imprime) */}
+      {/* Barra superior (no se imprime) */}
       <div className="print:hidden sticky top-0 z-10 bg-white border-b">
         <div className="mx-auto max-w-[900px] px-4 py-2 flex items-center justify-between">
           <div className="text-sm">
@@ -94,21 +92,25 @@ export default async function Page({
             <Link href={`/reports/machine-statement?${qs}`} className="underline">
               Volver al reporte
             </Link>
+
+            {/* 👇 BOTÓN IMPRIMIR */}
+            <button
+              id="print-btn"
+              className="rounded-md border px-3 py-1 hover:bg-black hover:text-white"
+              type="button"
+            >
+              Imprimir
+            </button>
+
             <span>Imprime con <b>Ctrl/Cmd + P</b></span>
           </div>
         </div>
       </div>
 
-      {/* hoja */}
+      {/* Contenido del reporte */}
       <div className="mx-auto my-6 max-w-[900px] bg-white shadow print:shadow-none print:my-0 p-6 rounded-xl print:rounded-none">
-        {/* encabezado */}
         <div className="flex items-center gap-4">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo" className="h-12 w-auto" />
-          ) : (
-            <div className="text-xl font-bold">PARTES Y EQUIPOS</div>
-          )}
+          <div className="text-xl font-bold">PARTES Y EQUIPOS</div>
           <div className="ml-auto text-right text-sm">
             <div><b>Fecha:</b> {todayStr}</div>
             <div><b>Período:</b> {from} → {to}</div>
@@ -118,7 +120,7 @@ export default async function Page({
 
         <hr className="my-4 border-black" />
 
-        {/* tarjetas totales */}
+        {/* Totales */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <div className="rounded-lg border p-3">
             <div className="text-xs">Total Cargos</div>
@@ -134,7 +136,7 @@ export default async function Page({
           </div>
         </div>
 
-        {/* tabla */}
+        {/* Tabla */}
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm border-collapse">
             <thead className="bg-white">
@@ -184,6 +186,14 @@ export default async function Page({
           * Los importes están expresados en Quetzales (Q).
         </div>
       </div>
+
+      {/* Script para botón imprimir */}
+      <Script id="print-click">{`
+        document.addEventListener('DOMContentLoaded', function () {
+          var b = document.getElementById('print-btn');
+          if (b) b.addEventListener('click', function () { window.print(); });
+        });
+      `}</Script>
 
       {/* Auto-print si llega ?auto=1 */}
       {searchParams?.auto === '1' && (
