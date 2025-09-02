@@ -39,13 +39,11 @@ export default async function Page({
 
   const sb = supabaseServer();
 
-  // 1) máquinas
   const { data: machines } = await sb.from('machines').select('id, code');
   const codeById = new Map<string, string>(
     ((machines ?? []) as Machine[]).map((m) => [m.id, m.code]),
   );
 
-  // 2) movimientos
   const { data: vrows } = await sb
     .from('v_machine_statement_lines')
     .select('machine_id, date, source, description, debit, credit')
@@ -56,7 +54,7 @@ export default async function Page({
     (r) => codeById.get(r.machine_id) === code,
   );
 
-  const rowsUI: RowUI[] = filtered.map((r) => ({
+  const rowsUI = filtered.map<RowUI>((r) => ({
     machine_code: code,
     op_date: r.date,
     source: r.source,
@@ -65,7 +63,6 @@ export default async function Page({
     credit: r.credit,
   }));
 
-  // 3) totales
   const total_cargos = rowsUI.reduce((a, r) => a + numeric(r.debit), 0);
   const total_abonos = rowsUI.reduce((a, r) => a + numeric(r.credit), 0);
   const saldo_total = total_cargos - total_abonos;
@@ -93,21 +90,20 @@ export default async function Page({
               Volver al reporte
             </Link>
 
-            {/* 👇 BOTÓN IMPRIMIR */}
-            <button
-              id="print-btn"
+            {/* Imprimir sin hidratar: funciona en Server Components */}
+            <a
+              href="javascript:window.print()"
               className="rounded-md border px-3 py-1 hover:bg-black hover:text-white"
-              type="button"
             >
               Imprimir
-            </button>
+            </a>
 
             <span>Imprime con <b>Ctrl/Cmd + P</b></span>
           </div>
         </div>
       </div>
 
-      {/* Contenido del reporte */}
+      {/* Contenido */}
       <div className="mx-auto my-6 max-w-[900px] bg-white shadow print:shadow-none print:my-0 p-6 rounded-xl print:rounded-none">
         <div className="flex items-center gap-4">
           <div className="text-xl font-bold">PARTES Y EQUIPOS</div>
@@ -120,7 +116,6 @@ export default async function Page({
 
         <hr className="my-4 border-black" />
 
-        {/* Totales */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
           <div className="rounded-lg border p-3">
             <div className="text-xs">Total Cargos</div>
@@ -136,7 +131,6 @@ export default async function Page({
           </div>
         </div>
 
-        {/* Tabla */}
         <div className="overflow-hidden rounded-lg border">
           <table className="w-full text-sm border-collapse">
             <thead className="bg-white">
@@ -187,14 +181,6 @@ export default async function Page({
         </div>
       </div>
 
-      {/* Script para botón imprimir */}
-      <Script id="print-click">{`
-        document.addEventListener('DOMContentLoaded', function () {
-          var b = document.getElementById('print-btn');
-          if (b) b.addEventListener('click', function () { window.print(); });
-        });
-      `}</Script>
-
       {/* Auto-print si llega ?auto=1 */}
       {searchParams?.auto === '1' && (
         <Script id="auto-print">{`
@@ -204,7 +190,6 @@ export default async function Page({
         `}</Script>
       )}
 
-      {/* Estilos de impresión */}
       <style>{`
         @page { size: A4; margin: 16mm; }
         @media print {
