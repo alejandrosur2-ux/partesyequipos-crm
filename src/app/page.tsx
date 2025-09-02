@@ -42,14 +42,19 @@ export default async function DashboardPage() {
     availableMachines = count ?? 0;
   }
 
-  // 4) Pagos del mes (suma)
-  const { data: mpRows = [] } = await sb
-    .from("machine_payments")
-    .select("amount, date")
-    .gte("date", monthStartStr())
-    .lte("date", monthEndStr());
+ // 4) Pagos del mes (suma)
+const { data: mpRowsRaw, error: mpErr } = await sb
+  .from('machine_payments')
+  .select('amount, date')
+  .gte('date', monthStartStr())
+  .lte('date', monthEndStr());
 
-  const monthPayments = mpRows.reduce((acc: number, r: any) => acc + (Number(r.amount) || 0), 0);
+const mpRows = (mpRowsRaw ?? []) as { amount: number | string | null }[];
+
+const monthPayments = mpRows.reduce(
+  (acc: number, r) => acc + (Number(r.amount ?? 0) || 0),
+  0
+);
 
   // 5) Últimos pagos (tabla)
   const { data: lastPayments = [] } = await sb
