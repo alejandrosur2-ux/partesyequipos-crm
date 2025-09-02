@@ -57,11 +57,16 @@ const monthPayments = mpRows.reduce(
 );
 
   // 5) Últimos pagos (tabla)
-  const { data: lastPayments = [] } = await sb
-    .from("machine_payments")
-    .select("date, description, amount")
-    .order("date", { ascending: false })
-    .limit(5);
+type LastPay = { date: string; description: string | null; amount: number | string | null };
+
+const { data: lastPaymentsRaw, error: lpErr } = await sb
+  .from('machine_payments')
+  .select('date, description, amount')
+  .order('date', { ascending: false })
+  .limit(5);
+
+// ✅ Siempre un arreglo, nunca null
+const lastPayments = (lastPaymentsRaw ?? []) as LastPay[];
 
   return (
     <main className="p-6 space-y-8">
