@@ -1,93 +1,57 @@
-// src/app/dashboard/page.tsx
+// Server Component
 import { supabaseServer } from "@/utils/supabase/server";
+import IncomeBarChart, { IncomePoint } from "@/components/charts/IncomeBarChart";
+import MachinePie, { Slice } from "@/components/charts/MachinePie";
 
-// Tipos básicos (ajústalos si tus columnas difieren)
-type Payment = { id: string; amount: number | string };
-type Rental = { id: string };
-type Client = { id: string };
-type Machine = { id: string };
-
-export default async function Dashboard() {
+async function getIncomeByMonth() {
   const sb = supabaseServer();
+  // Ejemplo: trae pagos del año actual y agrupa (haz los cambios a tu tabla/campos)
+  const { data = [] } = await sb
+    .from("payments")
+    .select("amount, date")
+    .gte("date", `${new Date().getFullYear()}-01-01`);
 
-  // 1) Trae datos
-  const [{ data: paymentsRaw }, { data: rentalsRaw }, { data: clientsRaw }, { data: machinesRaw }] =
-    await Promise.all([
-      sb.from("payments").select("id, amount"),
-      sb.from("rentals").select("id"),
-      sb.from("clients").select("id"),
-      sb.from("machines").select("id"),
-    ]);
+  // Agrupar por mes (ejemplo simple)
+  const map = new Map<string, number>();
+  for (const p of data) {
+    const d = new Date(p.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    map.set(key, (map.get(key) ?? 0) + Number(p.amount || 0));
+  }
 
-  // 2) Normaliza para que nunca sean null
-  const payments: Payment[] = (paymentsRaw ?? []) as Payment[];
-  const rentals: Rental[] = (rentalsRaw ?? []) as Rental[];
-  const clients: Client[] = (clientsRaw ?? []) as Client[];
-  const machines: Machine[] = (machinesRaw ?? []) as Machine[];
+  const arr: IncomePoint[] = Array.from(map.entries())
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([month, income]) => ({ month, income }));
 
-  // 3) KPIs seguros
-  const totalIngresos = payments.reduce(
-    (acc, p) => acc + (Number(p.amount) || 0),
-    0
-  );
-  const totalRentas = rentals.length;
-  const totalClientes = clients.length;
-  const totalMaquinas = machines.length;
+  return arr;
+}
+
+async function getMachineStatus() {
+  const sb = supabaseServer();
+  // Ejemplo: cuenta activas/inactivas
+  const { data: machines = [] } = await sb.from("machines").select("status");
+  const active = machines.filter((m: any) => m.status === "ACTIVE").length;
+  const idle = machines.length - active;
+  const pie: Slice[] = [
+    { name: "Activas", value: active },
+    { name: "Inactivas", value: idle },
+  ];
+  return pie;
+}
+
+export default async function DashboardPage() {
+  const [incomeByMonth, machineSlices] = await Promise.all([
+    getIncomeByMonth(),
+    getMachineStatus(),
+  ]);
 
   return (
-    <main className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-zinc-800 p-4">
-          <p className="text-zinc-400 text-sm">Ingresos (Q)</p>
-          <p className="text-3xl font-bold mt-1">{totalIngresos.toFixed(2)}</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-800 p-4">
-          <p className="text-zinc-400 text-sm">Rentas</p>
-          <p className="text-3xl font-bold mt-1">{totalRentas}</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-800 p-4">
-          <p className="text-zinc-400 text-sm">Clientes</p>
-          <p className="text-3xl font-bold mt-1">{totalClientes}</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-800 p-4">
-          <p className="text-zinc-400 text-sm">Máquinas</p>
-          <p className="text-3xl font-bold mt-1">{totalMaquinas}</p>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-zinc-800 p-4">
-        <h2 className="text-lg font-medium mb-3">Últimos pagos</h2>
-        <table className="w-full text-sm">
-          <thead className="text-zinc-400">
-            <tr>
-              <th className="text-left py-2">ID</th>
-              <th className="text-right py-2">Monto (Q)</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800">
-            {payments.length === 0 && (
-              <tr>
-                <td className="py-3" colSpan={2}>
-                  <span className="text-zinc-400">Sin pagos aún.</span>
-                </td>
-              </tr>
-            )}
-            {payments.map((p) => (
-              <tr key={p.id}>
-                <td className="py-2">{p.id}</td>
-                <td className="py-2 text-right">
-                  {(Number(p.amount) || 0).toFixed(2)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+    <main className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Panel</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <IncomeBarChart data={incomeByMonth} />
+        <MachinePie data={machineSlices} />
+      </div>
     </main>
   );
 }
