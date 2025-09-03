@@ -1,6 +1,5 @@
 // src/app/dashboard/page.tsx
 import { supabaseServer } from "@/utils/supabase/server";
-import { Card, CardContent } from "@/components/ui/card";
 
 type PaymentRow = {
   id: string;
@@ -45,7 +44,10 @@ export default async function Dashboard() {
     .gte("payment_date", monthStart)
     .lt("payment_date", nextMonthStart);
 
-  const monthTotal = (paymentsThisMonth ?? []).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const monthTotal = (paymentsThisMonth ?? []).reduce(
+    (a, p) => a + Number(p.amount || 0),
+    0
+  );
 
   // Últimos pagos (3 recientes)
   const { data: lastPayments } = await sb
@@ -63,9 +65,29 @@ export default async function Dashboard() {
   }));
 
   const fmt = (n: number) =>
-    n.toLocaleString("es-MX", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+    n.toLocaleString("es-MX", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    });
 
   const fmtDate = (d: string | null) => (d ? d : "—");
+
+  // Mini “Card” sin dependencia externa
+  const Box = ({
+    title,
+    value,
+  }: {
+    title: string;
+    value: string | number;
+  }) => (
+    <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+      <div className="p-6">
+        <div className="text-sm text-muted-foreground">{title}</div>
+        <div className="text-4xl font-bold mt-2">{value}</div>
+      </div>
+    </div>
+  );
 
   return (
     <main className="p-6 space-y-6">
@@ -73,35 +95,15 @@ export default async function Dashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-muted-foreground">Máquinas</div>
-            <div className="text-4xl font-bold mt-2">{machinesCount ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-muted-foreground">Rentas activas (hoy)</div>
-            <div className="text-4xl font-bold mt-2">{activeRentalsToday ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-muted-foreground">Máquinas disponibles</div>
-            <div className="text-4xl font-bold mt-2">{availableMachines ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-muted-foreground">Pagos del mes</div>
-            <div className="text-4xl font-bold mt-2">{fmt(monthTotal)}</div>
-          </CardContent>
-        </Card>
+        <Box title="Máquinas" value={machinesCount ?? 0} />
+        <Box title="Rentas activas (hoy)" value={activeRentalsToday ?? 0} />
+        <Box title="Máquinas disponibles" value={availableMachines ?? 0} />
+        <Box title="Pagos del mes" value={fmt(monthTotal)} />
       </div>
 
       {/* Últimos pagos */}
-      <Card>
-        <CardContent className="p-6">
+      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+        <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Últimos pagos</h2>
           <div className="grid grid-cols-12 text-sm text-muted-foreground border-b border-border pb-2">
             <div className="col-span-3">Fecha</div>
@@ -115,15 +117,17 @@ export default async function Dashboard() {
                 <div className="col-span-6">
                   {p.note || (p.method ? `Pago ${p.method}` : "Pago")}
                 </div>
-                <div className="col-span-3 text-right">{fmt(Number(p.amount || 0))}</div>
+                <div className="col-span-3 text-right">
+                  {fmt(Number(p.amount || 0))}
+                </div>
               </div>
             ))}
             {recent.length === 0 && (
               <div className="py-6 text-muted-foreground">Sin pagos aún.</div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }
