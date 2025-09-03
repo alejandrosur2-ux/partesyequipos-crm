@@ -1,76 +1,129 @@
 // src/app/dashboard/page.tsx
-import { supabaseServer } from '@/utils/supabase/server';
+import { supabaseServer } from "@/utils/supabase/server";
+import { Card, CardContent } from "@/components/ui/card";
 
-type Row = {
-  month: string;        // 'YYYY-MM'
-  month_start: string;  // date
-  total: number;
+type PaymentRow = {
+  id: string;
+  amount: number | string;
+  payment_date: string | null;
+  method: string | null;
+  note: string | null;
 };
 
 export default async function Dashboard() {
   const sb = supabaseServer();
 
-  const { data: rows, error } = await sb
-    .from('monthly_income')
-    .select('month, month_start, total')
-    .order('month_start', { ascending: true });
+  // Máquinas totales
+  const { count: machinesCount } = await sb
+    .from("machines")
+    .select("id", { count: "exact", head: true });
 
-  if (error) {
-    console.error('Error cargando monthly_income:', error.message);
-  }
+  // Rentas activas hoy (status = 'abierta')
+  const { count: activeRentalsToday } = await sb
+    .from("rentals")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "abierta");
 
-  const list: Row[] = rows ?? [];
+  // Máquinas disponibles (status = 'Disponible')
+  const { count: availableMachines } = await sb
+    .from("machines")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "Disponible");
 
-  const totalIngresos = list.reduce((a, r) => a + Number(r.total ?? 0), 0);
-  const mesesConActividad = list.length;
+  // Pagos del mes actual
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    .toISOString()
+    .slice(0, 10);
+  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+    .toISOString()
+    .slice(0, 10);
+
+  const { data: paymentsThisMonth } = await sb
+    .from("payments")
+    .select("amount,payment_date")
+    .gte("payment_date", monthStart)
+    .lt("payment_date", nextMonthStart);
+
+  const monthTotal = (paymentsThisMonth ?? []).reduce((a, p) => a + Number(p.amount || 0), 0);
+
+  // Últimos pagos (3 recientes)
+  const { data: lastPayments } = await sb
+    .from("payments")
+    .select("id,amount,payment_date,method,note")
+    .order("payment_date", { ascending: false })
+    .limit(3);
+
+  const recent: PaymentRow[] = (lastPayments ?? []).map((p) => ({
+    id: String(p.id),
+    amount: p.amount,
+    payment_date: p.payment_date,
+    method: p.method,
+    note: p.note,
+  }));
+
+  const fmt = (n: number) =>
+    n.toLocaleString("es-MX", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+
+  const fmtDate = (d: string | null) => (d ? d : "—");
 
   return (
     <main className="p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <h1 className="text-3xl font-semibold">Dashboard — Sencillo</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-2xl border p-4 bg-black/20">
-          <div className="text-sm opacity-70">Ingresos totales</div>
-          <div className="text-3xl font-bold">
-            {totalIngresos.toLocaleString('es-GT', { style: 'currency', currency: 'USD' })}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border p-4 bg-black/20">
-          <div className="text-sm opacity-70">Meses con actividad</div>
-          <div className="text-3xl font-bold">{mesesConActividad}</div>
-        </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm text-muted-foreground">Máquinas</div>
+            <div className="text-4xl font-bold mt-2">{machinesCount ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm text-muted-foreground">Rentas activas (hoy)</div>
+            <div className="text-4xl font-bold mt-2">{activeRentalsToday ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm text-muted-foreground">Máquinas disponibles</div>
+            <div className="text-4xl font-bold mt-2">{availableMachines ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-sm text-muted-foreground">Pagos del mes</div>
+            <div className="text-4xl font-bold mt-2">{fmt(monthTotal)}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      <section className="rounded-2xl border p-4 bg-black/20">
-        <h2 className="text-xl font-semibold mb-3">Ingresos por mes</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left opacity-70">
-                <th className="py-2">Mes</th>
-                <th className="py-2 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr>
-                  <td colSpan={2} className="py-6 text-center opacity-60">Sin datos aún.</td>
-                </tr>
-              ) : (
-                list.map(r => (
-                  <tr key={r.month} className="border-t border-white/10">
-                    <td className="py-2">{r.month}</td>
-                    <td className="py-2 text-right">
-                      {Number(r.total).toLocaleString('es-GT', { style: 'currency', currency: 'USD' })}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* Últimos pagos */}
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Últimos pagos</h2>
+          <div className="grid grid-cols-12 text-sm text-muted-foreground border-b border-border pb-2">
+            <div className="col-span-3">Fecha</div>
+            <div className="col-span-6">Descripción</div>
+            <div className="col-span-3 text-right">Monto</div>
+          </div>
+          <div className="divide-y divide-border">
+            {(recent.length ? recent : []).map((p) => (
+              <div key={p.id} className="grid grid-cols-12 py-3 items-center">
+                <div className="col-span-3">{fmtDate(p.payment_date)}</div>
+                <div className="col-span-6">
+                  {p.note || (p.method ? `Pago ${p.method}` : "Pago")}
+                </div>
+                <div className="col-span-3 text-right">{fmt(Number(p.amount || 0))}</div>
+              </div>
+            ))}
+            {recent.length === 0 && (
+              <div className="py-6 text-muted-foreground">Sin pagos aún.</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }
