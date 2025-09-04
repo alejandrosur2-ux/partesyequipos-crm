@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { supabaseServer } from "@/utils/supabase/server";
+import { createClient } from "@/lib/supabase/server-only";
+
 
 // Utilidades
 const todayStr = () => new Date().toISOString().slice(0, 10);
