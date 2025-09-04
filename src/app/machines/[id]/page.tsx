@@ -1,14 +1,20 @@
 // src/app/machines/[id]/page.tsx
 import { createClient } from "@/lib/supabase/server-only";
-import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import DeleteButton from "@/components/DeleteButton";
+import Banner from "@/components/Banner";
 
-type PageProps = { params: { id: string } };
-
-export default async function MachineDetailPage({ params }: PageProps) {
+export default async function MachineDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { msg?: string; err?: string };
+}) {
   const sb = createClient();
+  const bannerMsg = searchParams?.msg;
+  const bannerErr = searchParams?.err;
 
   const { data: m, error } = await sb
     .from("machines")
@@ -24,10 +30,18 @@ export default async function MachineDetailPage({ params }: PageProps) {
     const sb = createClient();
     const id = String(formData.get("id"));
 
+    const statusAllowed = new Set(["activo", "taller", "rentada", "baja"]);
+    const nameVal = String(formData.get("name") || "").trim();
+    const statusVal = String(formData.get("status") || "activo");
+
+    if (!nameVal) return redirect(`/machines/${id}?err=El nombre es obligatorio`);
+    if (!statusAllowed.has(statusVal))
+      return redirect(`/machines/${id}?err=Estado inválido`);
+
     const payload = {
-      name: String(formData.get("name") || ""),
+      name: nameVal,
       serial: String(formData.get("serial") || "") || null,
-      status: String(formData.get("status") || "activo"),
+      status: statusVal,
       daily_rate: formData.get("daily_rate")
         ? Number(formData.get("daily_rate"))
         : null,
@@ -35,9 +49,10 @@ export default async function MachineDetailPage({ params }: PageProps) {
     };
 
     const { error } = await sb.from("machines").update(payload).eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) return redirect(`/machines/${id}?err=${encodeURIComponent(error.message)}`);
 
-    revalidatePath(`/machines/${id}`);
+    // banner de éxito en la misma página
+    redirect(`/machines/${id}?msg=guardada`);
   }
 
   // ----- Server Action: eliminar -----
@@ -47,11 +62,15 @@ export default async function MachineDetailPage({ params }: PageProps) {
     const id = String(formData.get("id"));
     const { error } = await sb.from("machines").delete().eq("id", id);
     if (error) throw new Error(error.message);
-    redirect("/machines");
+    // banner en la lista
+    redirect("/machines?msg=eliminada");
   }
 
   return (
     <main className="p-6 max-w-xl space-y-4">
+      {bannerMsg && <Banner type="ok">Máquina {bannerMsg}.</Banner>}
+      {bannerErr && <Banner type="err">{bannerErr}</Banner>}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Máquina</h1>
         <Link href="/machines" className="underline">
