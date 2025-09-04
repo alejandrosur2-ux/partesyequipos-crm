@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server-only";
+
 import Link from "next/link";
 
 type Props = {
