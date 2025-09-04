@@ -1,10 +1,12 @@
 // src/app/machines/page.tsx
 import { createClient } from "@/lib/supabase/server-only";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import DeleteButton from "@/components/DeleteButton";
+import Banner from "@/components/Banner";
 
-type SearchParams = { q?: string; page?: string; status?: string };
+type SearchParams = { q?: string; page?: string; status?: string; msg?: string };
 
 export default async function MachinesPage({
   searchParams,
@@ -16,6 +18,8 @@ export default async function MachinesPage({
 
   const q = (sp.q ?? "").trim();
   const status = (sp.status ?? "").trim();
+  const msg = (sp.msg ?? "").trim();
+
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const pageSize = 10;
   const from = (page - 1) * pageSize;
@@ -28,22 +32,18 @@ export default async function MachinesPage({
     const id = String(formData.get("id"));
     const { error } = await sb.from("machines").delete().eq("id", id);
     if (error) throw new Error(error.message);
-    revalidatePath("/machines");
+    // banner en la lista
+    redirect("/machines?msg=eliminada");
   }
 
   // Build query con filtros
   let query = sb
     .from("machines")
-    .select("id,name,serial,status,daily_rate,created_at", {
-      count: "exact",
-    })
+    .select("id,name,serial,status,daily_rate,created_at", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (q) {
-    // busca por nombre o serie
-    query = query.or(
-      `name.ilike.%${q}%,serial.ilike.%${q}%`
-    );
+    query = query.or(`name.ilike.%${q}%,serial.ilike.%${q}%`);
   }
   if (status) {
     query = query.eq("status", status);
@@ -64,6 +64,8 @@ export default async function MachinesPage({
 
   return (
     <main className="p-6 space-y-4">
+      {msg && <Banner type="ok">Máquina {msg} correctamente.</Banner>}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Máquinas</h1>
         <Link
@@ -145,7 +147,6 @@ export default async function MachinesPage({
             </tbody>
           </table>
 
-          {/* Paginación */}
           <Pagination
             page={page}
             totalPages={totalPages}
@@ -160,7 +161,7 @@ export default async function MachinesPage({
   );
 }
 
-// --- Componentes auxiliares ---
+// --- Paginación ---
 function Pagination({
   page,
   totalPages,
@@ -185,7 +186,9 @@ function Pagination({
   return (
     <div className="flex items-center justify-between mt-3">
       <Link
-        className={`px-3 py-2 border rounded ${page <= 1 ? "opacity-50 pointer-events-none" : ""}`}
+        className={`px-3 py-2 border rounded ${
+          page <= 1 ? "opacity-50 pointer-events-none" : ""
+        }`}
         href={qs(prev)}
       >
         ← Anterior
@@ -196,7 +199,9 @@ function Pagination({
       </span>
 
       <Link
-        className={`px-3 py-2 border rounded ${page >= totalPages ? "opacity-50 pointer-events-none" : ""}`}
+        className={`px-3 py-2 border rounded ${
+          page >= totalPages ? "opacity-50 pointer-events-none" : ""
+        }`}
         href={qs(next)}
       >
         Siguiente →
