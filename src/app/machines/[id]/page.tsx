@@ -1,8 +1,8 @@
 // src/app/machines/[id]/page.tsx
 import { createClient } from "@/lib/supabase/server-only";
 import { revalidatePath } from "next/cache";
+import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 type PageProps = { params: { id: string } };
 
@@ -17,10 +17,12 @@ export default async function MachineDetailPage({ params }: PageProps) {
 
   if (error || !m) notFound();
 
+  // ----- Server Action: actualizar -----
   async function updateAction(formData: FormData) {
     "use server";
     const sb = createClient();
     const id = String(formData.get("id"));
+
     const payload = {
       name: String(formData.get("name") || ""),
       serial: String(formData.get("serial") || "") || null,
@@ -35,6 +37,16 @@ export default async function MachineDetailPage({ params }: PageProps) {
     if (error) throw new Error(error.message);
 
     revalidatePath(`/machines/${id}`);
+  }
+
+  // ----- Server Action: eliminar -----
+  async function deleteAction(formData: FormData) {
+    "use server";
+    const sb = createClient();
+    const id = String(formData.get("id"));
+    const { error } = await sb.from("machines").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    redirect("/machines");
   }
 
   return (
@@ -103,12 +115,24 @@ export default async function MachineDetailPage({ params }: PageProps) {
           />
         </label>
 
-        <button
-          type="submit"
-          className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
-        >
-          Guardar
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
+          >
+            Guardar
+          </button>
+
+          <form action={deleteAction}>
+            <input type="hidden" name="id" defaultValue={m.id} />
+            <button
+              type="submit"
+              className="px-4 py-2 border rounded bg-red-600 text-white hover:bg-red-700"
+            >
+              Eliminar
+            </button>
+          </form>
+        </div>
       </form>
 
       <p className="text-xs opacity-60">
@@ -117,4 +141,3 @@ export default async function MachineDetailPage({ params }: PageProps) {
     </main>
   );
 }
-
