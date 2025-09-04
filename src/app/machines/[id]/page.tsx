@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server-only";
+
 import { revalidatePath } from "next/cache";
 
 export default async function Page({ params }: { params: { id: string } }) {
