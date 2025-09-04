@@ -6,19 +6,22 @@ import { supabaseServer } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+// ⬇️ Server Action: NO retorna objeto; usa redirect en su lugar
 async function createMachine(formData: FormData) {
   "use server";
   const supabase = supabaseServer();
 
   const code = String(formData.get("code") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim() || null;
+  const name = (String(formData.get("name") ?? "").trim() || null) as string | null;
   const type = String(formData.get("type") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim() || null;
+  const status = (String(formData.get("status") ?? "").trim() || null) as string | null;
   const dailyRateRaw = String(formData.get("daily_rate") ?? "").trim();
   const daily_rate = dailyRateRaw ? Number(dailyRateRaw) : null;
 
   if (!code || !type) {
-    return { ok: false, message: "Código y tipo son obligatorios." };
+    redirect(
+      `/machines/new?error=${encodeURIComponent("Código y Tipo son obligatorios.")}`
+    );
   }
 
   const { error } = await supabase
@@ -26,15 +29,22 @@ async function createMachine(formData: FormData) {
     .insert([{ code, name, type, status, daily_rate }]);
 
   if (error) {
-    return { ok: false, message: error.message };
+    // Muestra el mensaje en la misma página
+    redirect(`/machines/new?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Refresca el listado y redirige
+  // Refresca el listado y navega
   revalidatePath("/machines");
   redirect("/machines");
 }
 
-export default function NewMachinePage() {
+export default function NewMachinePage({
+  searchParams,
+}: {
+  searchParams?: { error?: string };
+}) {
+  const errorMsg = searchParams?.error;
+
   return (
     <div className="p-6 max-w-2xl">
       <div className="mb-6 flex items-center justify-between">
@@ -43,6 +53,13 @@ export default function NewMachinePage() {
           ← Volver
         </Link>
       </div>
+
+      {/* Mensaje de error (si viene por querystring) */}
+      {errorMsg && (
+        <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300">
+          {decodeURIComponent(errorMsg)}
+        </div>
+      )}
 
       <form action={createMachine} className="space-y-5">
         <div>
@@ -102,7 +119,7 @@ export default function NewMachinePage() {
         <div className="pt-2">
           <button
             type="submit"
-            className="rounded-lg bg-white/10 hover:bg-white/20 px-4 py-2 text-sm transition"
+            className="rounded-lg bg-white/10 hover:bg白/20 px-4 py-2 text-sm transition"
           >
             Guardar
           </button>
