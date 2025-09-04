@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server-only";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import DeleteButton from "@/components/DeleteButton";
 
 type PageProps = { params: { id: string } };
 
@@ -125,12 +126,7 @@ export default async function MachineDetailPage({ params }: PageProps) {
 
           <form action={deleteAction}>
             <input type="hidden" name="id" defaultValue={m.id} />
-            <button
-              type="submit"
-              className="px-4 py-2 border rounded bg-red-600 text-white hover:bg-red-700"
-            >
-              Eliminar
-            </button>
+            <DeleteButton />
           </form>
         </div>
       </form>
