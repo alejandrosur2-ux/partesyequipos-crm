@@ -1,134 +1,42 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
+// src/app/page.tsx
 import { createClient } from "@/lib/supabase/server-only";
 
-
-// Utilidades
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const monthStartStr = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-};
-const monthEndStr = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-};
-const fmtMoney = (n: number) =>
-  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
-
 export default async function DashboardPage() {
-  const sb = supabaseServer();
+  const sb = createClient();
 
   // 1) Máquinas (total)
   const { count: totalMachines = 0 } = await sb
     .from("machines")
-    .select("id", { head: true, count: "exact" });
+    .select("*", { count: "exact", head: true });
 
-  // 2) Rentas activas hoy (start_date <= hoy y end_date >= hoy)
-  const { count: activeRentals = 0 } = await sb
-    .from("rentals")
-    .select("id", { head: true, count: "exact" })
-    .lte("start_date", todayStr())
-    .gte("end_date", todayStr());
+  // 2) Máquinas activas
+  const { count: activeMachines = 0 } = await sb
+    .from("machines")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "activo");
 
-  // 3) Máquinas disponibles (si tienes columna status='Disponible')
-  //   Si no usas esa columna, deja este KPI en 0 o comenta el bloque.
-  let availableMachines = 0;
-  {
-    const { count } = await sb
-      .from("machines")
-      .select("id", { head: true, count: "exact" })
-      .eq("status", "Disponible");
-    availableMachines = count ?? 0;
-  }
-
- // 4) Pagos del mes (suma)
-const { data: mpRowsRaw, error: mpErr } = await sb
-  .from('machine_payments')
-  .select('amount, date')
-  .gte('date', monthStartStr())
-  .lte('date', monthEndStr());
-
-const mpRows = (mpRowsRaw ?? []) as { amount: number | string | null }[];
-
-const monthPayments = mpRows.reduce(
-  (acc: number, r) => acc + (Number(r.amount ?? 0) || 0),
-  0
-);
-
-  // 5) Últimos pagos (tabla)
-type LastPay = { date: string; description: string | null; amount: number | string | null };
-
-const { data: lastPaymentsRaw, error: lpErr } = await sb
-  .from('machine_payments')
-  .select('date, description, amount')
-  .order('date', { ascending: false })
-  .limit(5);
-
-// ✅ Siempre un arreglo, nunca null
-const lastPayments = (lastPaymentsRaw ?? []) as LastPay[];
+  // 3) Oportunidades (ejemplo si ya tienes tabla opportunities)
+  const { count: totalOpportunities = 0 } = await sb
+    .from("crm_opportunities")
+    .select("*", { count: "exact", head: true });
 
   return (
-    <main className="p-6 space-y-8">
-      <h1 className="text-2xl font-semibold">Dashboard — Sencillo</h1>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="rounded-2xl border p-4 bg-zinc-900/40">
-          <div className="text-sm text-zinc-400">Máquinas</div>
-          <div className="text-3xl font-bold">{totalMachines}</div>
+    <main className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="border rounded p-4 shadow">
+          <h2 className="font-semibold">Total máquinas</h2>
+          <p className="text-2xl">{totalMachines}</p>
         </div>
-        <div className="rounded-2xl border p-4 bg-zinc-900/40">
-          <div className="text-sm text-zinc-400">Rentas activas (hoy)</div>
-          <div className="text-3xl font-bold">{activeRentals}</div>
+        <div className="border rounded p-4 shadow">
+          <h2 className="font-semibold">Máquinas activas</h2>
+          <p className="text-2xl">{activeMachines}</p>
         </div>
-        <div className="rounded-2xl border p-4 bg-zinc-900/40">
-          <div className="text-sm text-zinc-400">Máquinas disponibles</div>
-          <div className="text-3xl font-bold">{availableMachines}</div>
-        </div>
-        <div className="rounded-2xl border p-4 bg-zinc-900/40">
-          <div className="text-sm text-zinc-400">Pagos del mes</div>
-          <div className="text-3xl font-bold">{fmtMoney(monthPayments)}</div>
+        <div className="border rounded p-4 shadow">
+          <h2 className="font-semibold">Oportunidades</h2>
+          <p className="text-2xl">{totalOpportunities}</p>
         </div>
       </div>
-
-      {/* Últimos pagos */}
-      <div className="rounded-2xl border p-4 bg-zinc-900/40">
-        <h2 className="text-lg font-semibold mb-3">Últimos pagos</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-zinc-400">
-              <tr>
-                <th className="py-2 pr-4">Fecha</th>
-                <th className="py-2 pr-4">Descripción</th>
-                <th className="py-2 pr-4">Monto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {lastPayments.length === 0 && (
-                <tr>
-                  <td className="py-3" colSpan={3}>
-                    <span className="text-zinc-400">Sin pagos aún.</span>
-                  </td>
-                </tr>
-              )}
-              {lastPayments.map((p: any, i: number) => (
-                <tr key={i}>
-                  <td className="py-2 pr-4">{String(p.date)}</td>
-                  <td className="py-2 pr-4">{p.description ?? "-"}</td>
-                  <td className="py-2 pr-4">{fmtMoney(Number(p.amount) || 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p className="text-xs text-zinc-500">
-        * Este tablero lee directamente de Supabase: <code>machines</code>, <code>rentals</code> y{" "}
-        <code>machine_payments</code>.
-      </p>
     </main>
   );
 }
