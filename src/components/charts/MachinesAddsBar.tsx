@@ -10,6 +10,7 @@ import {
 } from "recharts";
 
 type Item = { mes: string; total: number };
+
 export default function MachinesAddsBar({ data }: { data: Item[] }) {
   return (
     <div className="h-56 w-full">
