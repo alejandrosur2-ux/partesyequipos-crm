@@ -1,5 +1,11 @@
 // src/components/Banner.tsx
-export default function Banner({ type, children }: { type: "ok" | "err"; children: React.ReactNode }) {
+export default function Banner({
+  type,
+  children,
+}: {
+  type: "ok" | "err";
+  children: React.ReactNode;
+}) {
   const styles =
     type === "ok"
       ? "bg-green-50 text-green-800 border-green-200"
