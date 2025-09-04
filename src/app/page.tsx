@@ -5,14 +5,18 @@ import { createClient } from "@/lib/supabase/server-only";
 export default async function DashboardPage() {
   const sb = createClient();
 
-  // Métricas
-  const [{ count: total = 0 }, { count: activas = 0 }] = await Promise.all([
+  // Trae conteos
+  const [allRes, activeRes] = await Promise.all([
     sb.from("machines").select("*", { count: "exact", head: true }),
     sb
       .from("machines")
       .select("*", { count: "exact", head: true })
       .eq("status", "activo"),
   ]);
+
+  // Asegura números (no null)
+  const total = allRes.count ?? 0;
+  const activas = activeRes.count ?? 0;
 
   // Últimas 8 máquinas
   const { data: recent } = await sb
@@ -45,10 +49,7 @@ export default async function DashboardPage() {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard title="Máquinas totales" value={total} />
         <StatCard title="Máquinas activas" value={activas} />
-        <StatCard
-          title="Inactivas"
-          value={Math.max(total - activas, 0)}
-        />
+        <StatCard title="Inactivas" value={Math.max(total - activas, 0)} />
       </section>
 
       {/* Últimas máquinas */}
@@ -96,7 +97,7 @@ export default async function DashboardPage() {
   );
 }
 
-// ---- UI helpers (server-safe, sin librerías externas) ----
+// ---- UI helpers ----
 function StatCard({ title, value }: { title: string; value: number | string }) {
   return (
     <div className="border rounded p-4 shadow-sm">
