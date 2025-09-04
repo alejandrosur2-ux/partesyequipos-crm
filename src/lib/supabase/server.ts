@@ -3,20 +3,19 @@ import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 export function createClient() {
-  const cookieStore = cookies();
+  const cookieStore = cookies(); // <- Promise en Next 15
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        get: async (name: string) => (await cookieStore).get(name)?.value,
+        set: async (name: string, value: string, options: CookieOptions) => {
+          (await cookieStore).set({ name, value, ...options });
         },
-        set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          cookieStore.set({ name, value: "", ...options });
+        remove: async (name: string, options: CookieOptions) => {
+          (await cookieStore).set({ name, value: "", ...options });
         },
       },
     }
