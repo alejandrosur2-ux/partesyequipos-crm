@@ -134,7 +134,7 @@ export default async function DashboardPage() {
                   ))}
                   {recientes.length === 0 && (
                     <tr>
-                      <td className="p-3 text-center text-slate-500" colSpan={5}>Sin datos todavía.</td>
+                      <td className="p-3 text-center text-slate-800" colSpan={5}>Sin datos todavía.</td>
                     </tr>
                   )}
                 </tbody>
