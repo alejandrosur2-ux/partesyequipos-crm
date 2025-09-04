@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { supabase } from "@/lib/supabase/client";
+
 import { createClient } from "@/lib/supabase/server"; // si usas cliente de browser, cambia a "@/lib/supabase/client"
 
 export default function NewMachineForm() {
