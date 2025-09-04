@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                       <td className="px-3 py-2">{r.daily_rate ?? "-"}</td>
                       <td className="px-3 py-2">{new Date(r.created_at).toLocaleString()}</td>
                       <td className="px-3 py-2 text-center">
-                        <Link href={`/machines/${r.id}`} className="text-sky-600 hover:underline">Ver</Link>
+                        <Link href={`/machines/${r.id}`} className="text-sky-800 hover:underline">Ver</Link>
                       </td>
                     </tr>
                   ))}
