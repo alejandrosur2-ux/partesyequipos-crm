@@ -1,9 +1,21 @@
 // src/app/machines/page.tsx
 import { createClient } from "@/lib/supabase/server-only";
+import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import DeleteButton from "@/components/DeleteButton";
 
 export default async function MachinesPage() {
   const sb = createClient();
+
+  // ----- Server Action: eliminar desde la lista -----
+  async function deleteAction(formData: FormData) {
+    "use server";
+    const sb = createClient();
+    const id = String(formData.get("id"));
+    const { error } = await sb.from("machines").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/machines");
+  }
 
   const { data: machines, error } = await sb
     .from("machines")
@@ -33,10 +45,10 @@ export default async function MachinesPage() {
         <table className="min-w-full border">
           <thead>
             <tr className="bg-gray-100">
-              <th className="p-2 border">Nombre</th>
-              <th className="p-2 border">Serie</th>
-              <th className="p-2 border">Estado</th>
-              <th className="p-2 border">Tarifa diaria</th>
+              <th className="p-2 border text-left">Nombre</th>
+              <th className="p-2 border text-left">Serie</th>
+              <th className="p-2 border text-left">Estado</th>
+              <th className="p-2 border text-left">Tarifa diaria</th>
               <th className="p-2 border">Acciones</th>
             </tr>
           </thead>
@@ -48,12 +60,19 @@ export default async function MachinesPage() {
                 <td className="p-2 border">{m.status}</td>
                 <td className="p-2 border">{m.daily_rate ?? "-"}</td>
                 <td className="p-2 border">
-                  <Link
-                    href={`/machines/${m.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Ver
-                  </Link>
+                  <div className="flex items-center gap-3 justify-center">
+                    <Link
+                      href={`/machines/${m.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Ver
+                    </Link>
+
+                    <form action={deleteAction}>
+                      <input type="hidden" name="id" value={m.id} />
+                      <DeleteButton />
+                    </form>
+                  </div>
                 </td>
               </tr>
             ))}
