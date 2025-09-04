@@ -1,133 +1,157 @@
 // src/app/dashboard/page.tsx
 import { supabaseServer } from "@/utils/supabase/server";
 
+// --- utilidades pequeñas ---
+const fmtMoney = (n: number) =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "USD" }).format(
+    n || 0
+  );
+
+const fmtDate = (d: string | null) =>
+  d ? new Date(d).toISOString().slice(0, 10) : "—";
+
+type RentalRow = { machine_id: string | null; status: string | null };
 type PaymentRow = {
   id: string;
-  amount: number | string;
+  amount: number | null;
   payment_date: string | null;
   method: string | null;
-  note: string | null;
 };
 
 export default async function Dashboard() {
-  const sb = supabaseServer();
+  const supabase = supabaseServer();
 
-  // Máquinas totales
-  const { count: machinesCount } = await sb
+  // 1) Máquinas totales
+  const { data: machines, error: errMachines } = await supabase
     .from("machines")
-    .select("id", { count: "exact", head: true });
+    .select("id");
 
-  // Rentas activas hoy (status = 'abierta')
-  const { count: activeRentalsToday } = await sb
+  if (errMachines) {
+    console.error("machines error:", errMachines);
+  }
+
+  const totalMachines = machines?.length ?? 0;
+
+  // 2) Rentas abiertas (para disponibles y KPI “rentas activas”)
+  const { data: rentalsOpen, error: errOpen } = await supabase
     .from("rentals")
-    .select("id", { count: "exact", head: true })
+    .select("machine_id,status")
     .eq("status", "abierta");
 
-  // Máquinas disponibles (status = 'Disponible')
-  const { count: availableMachines } = await sb
-    .from("machines")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "Disponible");
+  if (errOpen) console.error("rentals open error:", errOpen);
 
-  // Pagos del mes actual
+  const openMachineIds = new Set(
+    (rentalsOpen ?? [])
+      .map((r: RentalRow) => r.machine_id)
+      .filter((id): id is string => !!id)
+  );
+
+  const activeRentalsCount = openMachineIds.size; // máquinas con renta abierta (distintas)
+  const availableMachines = Math.max(totalMachines - activeRentalsCount, 0);
+
+  // 3) Pagos del mes actual
   const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
     .toISOString()
     .slice(0, 10);
-  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     .toISOString()
     .slice(0, 10);
 
-  const { data: paymentsThisMonth } = await sb
+  const { data: monthPayments, error: errMonth } = await supabase
     .from("payments")
     .select("amount,payment_date")
-    .gte("payment_date", monthStart)
-    .lt("payment_date", nextMonthStart);
+    .gte("payment_date", firstDay)
+    .lte("payment_date", lastDay);
 
-  const monthTotal = (paymentsThisMonth ?? []).reduce(
-    (a, p) => a + Number(p.amount || 0),
+  if (errMonth) console.error("payments month error:", errMonth);
+
+  const totalMonthPayments = (monthPayments ?? []).reduce(
+    (a, p) => a + Number(p.amount ?? 0),
     0
   );
 
-  // Últimos pagos (3 recientes)
-  const { data: lastPayments } = await sb
+  // 4) Últimos pagos (tabla)
+  const { data: lastPayments, error: errLast } = await supabase
     .from("payments")
-    .select("id,amount,payment_date,method,note")
+    .select("id,amount,payment_date,method")
     .order("payment_date", { ascending: false })
-    .limit(3);
+    .limit(10);
 
-  const recent: PaymentRow[] = (lastPayments ?? []).map((p) => ({
-    id: String(p.id),
-    amount: p.amount,
-    payment_date: p.payment_date,
-    method: p.method,
-    note: p.note,
-  }));
-
-  const fmt = (n: number) =>
-    n.toLocaleString("es-MX", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    });
-
-  const fmtDate = (d: string | null) => (d ? d : "—");
-
-  // Mini “Card” sin dependencia externa
-  const Box = ({
-    title,
-    value,
-  }: {
-    title: string;
-    value: string | number;
-  }) => (
-    <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-      <div className="p-6">
-        <div className="text-sm text-muted-foreground">{title}</div>
-        <div className="text-4xl font-bold mt-2">{value}</div>
-      </div>
-    </div>
-  );
+  if (errLast) console.error("last payments error:", errLast);
 
   return (
-    <main className="p-6 space-y-6">
-      <h1 className="text-3xl font-semibold">Dashboard — Sencillo</h1>
+    <main className="px-6 py-8">
+      <h1 className="text-3xl font-semibold mb-6">Dashboard — Sencillo</h1>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Box title="Máquinas" value={machinesCount ?? 0} />
-        <Box title="Rentas activas (hoy)" value={activeRentalsToday ?? 0} />
-        <Box title="Máquinas disponibles" value={availableMachines ?? 0} />
-        <Box title="Pagos del mes" value={fmt(monthTotal)} />
-      </div>
+        <div className="rounded-2xl border border-zinc-700/60 p-5">
+          <div className="text-zinc-400">Máquinas</div>
+          <div className="text-5xl font-semibold mt-2">{totalMachines}</div>
+        </div>
 
-      {/* Últimos pagos */}
-      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Últimos pagos</h2>
-          <div className="grid grid-cols-12 text-sm text-muted-foreground border-b border-border pb-2">
-            <div className="col-span-3">Fecha</div>
-            <div className="col-span-6">Descripción</div>
-            <div className="col-span-3 text-right">Monto</div>
+        <div className="rounded-2xl border border-zinc-700/60 p-5">
+          <div className="text-zinc-400">Rentas activas (hoy)</div>
+          <div className="text-5xl font-semibold mt-2">{activeRentalsCount}</div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-700/60 p-5">
+          <div className="text-zinc-400">Máquinas disponibles</div>
+          <div className="text-5xl font-semibold mt-2">
+            {availableMachines}
           </div>
-          <div className="divide-y divide-border">
-            {(recent.length ? recent : []).map((p) => (
-              <div key={p.id} className="grid grid-cols-12 py-3 items-center">
-                <div className="col-span-3">{fmtDate(p.payment_date)}</div>
-                <div className="col-span-6">
-                  {p.note || (p.method ? `Pago ${p.method}` : "Pago")}
-                </div>
-                <div className="col-span-3 text-right">
-                  {fmt(Number(p.amount || 0))}
-                </div>
-              </div>
-            ))}
-            {recent.length === 0 && (
-              <div className="py-6 text-muted-foreground">Sin pagos aún.</div>
-            )}
+        </div>
+
+        <div className="rounded-2xl border border-zinc-700/60 p-5">
+          <div className="text-zinc-400">Pagos del mes</div>
+          <div className="text-3xl md:text-4xl font-semibold mt-2">
+            {fmtMoney(totalMonthPayments)}
           </div>
         </div>
       </div>
+
+      {/* Últimos pagos */}
+      <section className="mt-8 rounded-2xl border border-zinc-700/60 overflow-hidden">
+        <div className="px-5 py-4 text-lg font-medium border-b border-zinc-700/60">
+          Últimos pagos
+        </div>
+
+        {(!lastPayments || lastPayments.length === 0) && (
+          <div className="px-5 py-6 text-zinc-400">Sin pagos aún.</div>
+        )}
+
+        {lastPayments && lastPayments.length > 0 && (
+          <table className="w-full text-sm">
+            <thead className="text-zinc-400">
+              <tr className="border-b border-zinc-700/60">
+                <th className="text-left font-normal px-5 py-3">Fecha</th>
+                <th className="text-left font-normal px-5 py-3">
+                  Descripción
+                </th>
+                <th className="text-right font-normal px-5 py-3">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lastPayments.map((p: PaymentRow) => (
+                <tr
+                  key={p.id}
+                  className="border-b border-zinc-800/50 last:border-b-0"
+                >
+                  <td className="px-5 py-3">{fmtDate(p.payment_date)}</td>
+                  <td className="px-5 py-3">
+                    {p.method ? p.method : "Pago"}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {fmtMoney(Number(p.amount ?? 0))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </main>
   );
 }
+
