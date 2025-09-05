@@ -1,7 +1,6 @@
 // src/app/machines/[id]/page.tsx
-import Link from "next/link";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import MachineEditForm from "./MachineEditForm";
 
@@ -15,23 +14,6 @@ type Machine = {
   created_at: string | null;
 };
 
-const fmtMoney = (n: number | null | undefined) =>
-  typeof n === "number"
-    ? new Intl.NumberFormat("es-GT", {
-        style: "currency",
-        currency: "GTQ",
-        maximumFractionDigits: 0,
-      }).format(n)
-    : "-";
-
-const fmtDate = (iso: string | null | undefined) =>
-  iso
-    ? new Intl.DateTimeFormat("es-GT", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(new Date(iso))
-    : "-";
-
 interface Props {
   params: { id: string };
 }
@@ -39,126 +21,150 @@ interface Props {
 export default async function MachineDetailPage({ params }: Props) {
   const sb = supabaseServer();
 
-  const { data, error } = await sb
+  // 1) Cargar máquina
+  const { data: machine, error } = await sb
     .from("machines")
-    .select("id, name, serial, status, daily_rate, notes, created_at")
+    .select(
+      "id, name, serial, status, daily_rate, notes, created_at"
+    )
     .eq("id", params.id)
     .single();
 
-  if (error || !data) {
-    redirect("/machines");
+  if (error || !machine) {
+    redirect("/machines"); // si no existe
   }
 
-  const m = data as Machine;
-
-  // -------- Server Action: actualizar máquina ----------
+  // 2) Acciones del servidor (editar / eliminar)
   async function updateMachine(formData: FormData) {
     "use server";
-    const name = (formData.get("name") as string) || null;
-    const serial = (formData.get("serial") as string) || null;
-    const status = (formData.get("status") as string) || null;
-    const notes = (formData.get("notes") as string) || null;
 
-    const rateRaw = formData.get("daily_rate") as string | null;
+    const name = (formData.get("name") as string)?.trim() || null;
+    const serial = (formData.get("serial") as string)?.trim() || null;
+    const status = (formData.get("status") as string)?.trim() || null;
+    const daily_rate_raw = formData.get("daily_rate") as string;
     const daily_rate =
-      rateRaw && rateRaw.trim() !== "" ? Number(rateRaw) : null;
+      daily_rate_raw === "" || daily_rate_raw == null
+        ? null
+        : Number(daily_rate_raw);
+    const notes = (formData.get("notes") as string)?.trim() || null;
 
     const sb = supabaseServer();
     const { error } = await sb
       .from("machines")
-      .update({ name, serial, status, daily_rate, notes })
+      .update({
+        name,
+        serial,
+        status,
+        daily_rate,
+        notes,
+      })
       .eq("id", params.id);
 
     if (error) {
       throw new Error(error.message);
     }
 
+    // refrescar páginas relacionadas
+    revalidatePath("/dashboard");
     revalidatePath(`/machines/${params.id}`);
-    redirect(`/machines/${params.id}`);
   }
 
+  async function deleteMachine() {
+    "use server";
+    const sb = supabaseServer();
+    const { error } = await sb.from("machines").delete().eq("id", params.id);
+    if (error) {
+      throw new Error(error.message);
+    }
+    revalidatePath("/dashboard");
+    revalidatePath("/machines");
+    redirect("/machines");
+  }
+
+  // 3) UI
   return (
-    <main className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl md:text-3xl font-semibold text-white">
-          {m.name ?? "-"}
+    <div className="max-w-6xl mx-auto px-4 py-8 text-white">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {machine.name ?? "Sin nombre"}
         </h1>
 
-        <Link
-          href="/machines"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 text-white transition-colors"
+        <a
+          href="/dashboard"
+          className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors"
         >
           ← Volver
-        </Link>
+        </a>
       </div>
 
-      {/* Info + Notas */}
-      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur p-5">
-          <h2 className="text-white/90 font-medium mb-4">Información</h2>
+      {/* Tarjetas (mejora de contraste) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-lg font-medium text-gray-200 mb-4">
+            Información
+          </h2>
 
-          <div className="space-y-3">
-            <Row label="Nombre" value={m.name ?? "-"} />
-            <Row label="Serie" value={m.serial ?? "-"} />
-            <Row
-              label="Estado"
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+            <InfoRow label="Nombre" value={machine.name ?? "—"} />
+            <InfoRow label="Serie" value={machine.serial ?? "—"} />
+            <InfoRow label="Estado" value={machine.status ?? "—"} />
+            <InfoRow
+              label="Tarifa diaria"
               value={
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    (m.status ?? "").toLowerCase() === "activo" ||
-                    (m.status ?? "").toLowerCase() === "active"
-                      ? "bg-green-500/20 text-green-400"
-                      : "bg-gray-500/20 text-gray-300"
-                  }`}
-                >
-                  {m.status ?? "-"}
-                </span>
+                machine.daily_rate != null ? `$${machine.daily_rate}` : "—"
               }
             />
-            <Row label="Tarifa diaria" value={fmtMoney(m.daily_rate)} />
-            <Row label="Creada" value={fmtDate(m.created_at)} />
-          </div>
+            <InfoRow
+              label="Creada"
+              value={
+                machine.created_at
+                  ? new Date(machine.created_at).toLocaleString()
+                  : "—"
+              }
+            />
+          </dl>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur p-5">
-          <h2 className="text-white/90 font-medium mb-4">Observaciones</h2>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-lg font-medium text-gray-200 mb-4">
+            Observaciones
+          </h2>
           <p className="text-gray-200">
-            {m.notes?.trim() ? m.notes : "Sin observaciones."}
+            {machine.notes && machine.notes.trim() !== ""
+              ? machine.notes
+              : "Sin observaciones."}
           </p>
         </div>
-      </section>
+      </div>
 
-      {/* Formulario de edición */}
-      <section className="mt-8">
-        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-white/90 font-medium">Editar datos</h2>
-          </div>
+      {/* Editor */}
+      <div className="mt-8 flex items-center justify-between">
+        <h2 className="text-xl font-medium text-gray-200">
+          Editar máquina
+        </h2>
 
-          <div className="mt-4">
-            <MachineEditForm
-              machine={m}
-              action={updateMachine}
-            />
-          </div>
-        </div>
-      </section>
-    </main>
+        <form action={deleteMachine}>
+          <button
+            type="submit"
+            className="px-3 py-2 rounded-md bg-red-600/80 hover:bg-red-600 transition-colors"
+          >
+            Eliminar
+          </button>
+        </form>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-6">
+        <MachineEditForm machine={machine as Machine} action={updateMachine} />
+      </div>
+    </div>
   );
 }
 
-/** Fila label/valor con buen contraste */
-function Row({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="text-gray-400">{label}</div>
-      <div className="col-span-2 text-white">{value}</div>
+    <div>
+      <dt className="text-sm text-gray-400">{label}</dt>
+      <dd className="text-base font-medium text-white">{value}</dd>
     </div>
   );
 }
