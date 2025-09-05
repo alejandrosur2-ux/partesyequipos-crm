@@ -9,29 +9,25 @@ type MachineRow = {
   created_at: string;
 };
 
-export const revalidate = 0; // datos frescos en cada request
+export const revalidate = 0;
 
 export default async function DashboardPage() {
   const sb = supabaseServer();
 
   // Total de máquinas
-  const { count: total = 0, error: totalErr } = await sb
+  const { count: totalCount, error: totalErr } = await sb
     .from("machines")
     .select("*", { count: "exact", head: true });
-
-  if (totalErr) {
-    console.error("Error total machines:", totalErr);
-  }
+  if (totalErr) console.error("Error total machines:", totalErr);
+  const total: number = totalCount ?? 0;
 
   // Máquinas activas
-  const { count: activas = 0, error: actErr } = await sb
+  const { count: activeCount, error: actErr } = await sb
     .from("machines")
     .select("*", { count: "exact", head: true })
     .eq("status", "active");
-
-  if (actErr) {
-    console.error("Error active machines:", actErr);
-  }
+  if (actErr) console.error("Error active machines:", actErr);
+  const activas: number = activeCount ?? 0;
 
   // Últimas máquinas
   const { data: ultimas = [], error: lastErr } = await sb
@@ -39,10 +35,9 @@ export default async function DashboardPage() {
     .select("id,name,status,daily_rate,created_at")
     .order("created_at", { ascending: false })
     .limit(10);
+  if (lastErr) console.error("Error latest machines:", lastErr);
 
-  if (lastErr) {
-    console.error("Error latest machines:", lastErr);
-  }
+  const actividadPct = total > 0 ? Math.round((activas / total) * 100) : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -50,13 +45,11 @@ export default async function DashboardPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-600">
-            Resumen rápido de tus máquinas.
-          </p>
+          <p className="text-sm text-gray-600">Resumen rápido de tus máquinas.</p>
         </div>
       </header>
 
-      {/* KPIs simples (sin librerías externas) */}
+      {/* KPIs */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl shadow-md text-white bg-gradient-to-r from-purple-500 to-purple-600">
           <div className="p-4 border-b border-white/20">
@@ -83,9 +76,7 @@ export default async function DashboardPage() {
             <h3 className="text-sm font-medium">Estado</h3>
           </div>
           <div className="p-4">
-            <p className="text-3xl font-bold">
-              {total > 0 ? `${Math.round((activas / total) * 100)}%` : "0%"}
-            </p>
+            <p className="text-3xl font-bold">{actividadPct}%</p>
             <p className="opacity-80">Actividad relativa</p>
           </div>
         </div>
