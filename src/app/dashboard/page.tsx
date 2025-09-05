@@ -1,168 +1,159 @@
 // src/app/dashboard/page.tsx
+import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 
-type MachineRow = {
+/** Tipado mínimo para la tabla de máquinas */
+type Machine = {
   id: string;
   name: string | null;
   status: string | null;
   daily_rate: number | null;
-  created_at: string;
+  created_at: string | null;
 };
 
-export const revalidate = 0;
+/** Helpers de formato (moneda y fecha) */
+const fmtMoney = (n: number | null | undefined) =>
+  typeof n === "number"
+    ? new Intl.NumberFormat("es-GT", {
+        style: "currency",
+        currency: "GTQ",
+        maximumFractionDigits: 0,
+      }).format(n) + " / día"
+    : "-";
+
+const fmtDate = (iso: string | null | undefined) =>
+  iso
+    ? new Intl.DateTimeFormat("es-GT", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(new Date(iso))
+    : "-";
+
+/** Badge de estado */
+function StatusBadge({ status }: { status: string | null }) {
+  const s = (status ?? "").toLowerCase();
+  const isActive = s === "activo" || s === "active";
+  const badgeClass = isActive
+    ? "bg-green-500/20 text-green-400"
+    : "bg-gray-500/20 text-gray-300";
+  const label = status ?? "-";
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
+      {label}
+    </span>
+  );
+}
 
 export default async function DashboardPage() {
   const sb = supabaseServer();
 
-  // Total
+  // Conteos
   const { count: totalCount } = await sb
     .from("machines")
-    .select("*", { count: "exact", head: true });
-  const total = totalCount ?? 0;
+    .select("id", { count: "exact", head: true });
 
-  // Activas
   const { count: activeCount } = await sb
     .from("machines")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "active");
+    .select("id", { count: "exact", head: true })
+    .in("status", ["activo", "active"]);
+
+  const total = totalCount ?? 0;
   const activas = activeCount ?? 0;
+  const actividad = total > 0 ? Math.round((activas / total) * 100) : 0;
 
-  // Últimas
-  const { data: ultimasRaw } = await sb
+  // Últimas máquinas (7)
+  const { data: ultimasData } = await sb
     .from("machines")
-    .select("id,name,status,daily_rate,created_at")
+    .select("id, name, status, daily_rate, created_at")
     .order("created_at", { ascending: false })
-    .limit(10);
-  const ultimas: MachineRow[] = (ultimasRaw ?? []) as MachineRow[];
+    .limit(7);
 
-  const actividadPct = total > 0 ? Math.round((activas / total) * 100) : 0;
-
-  const fmt = new Intl.DateTimeFormat("es", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
+  const ultimas: Machine[] = Array.isArray(ultimasData) ? ultimasData : [];
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Título */}
-        <header>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-neutral-300">
-            Resumen rápido de tus máquinas.
-          </p>
-        </header>
+    <main className="p-6 md:p-8 max-w-7xl mx-auto">
+      <h1 className="text-2xl md:text-3xl font-semibold text-white">Dashboard</h1>
+      <p className="text-gray-400 mt-1">Resumen rápido de tus máquinas.</p>
 
-        {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-xl shadow-md text-white bg-gradient-to-r from-purple-600 to-purple-500">
-            <div className="p-4 border-b border-white/20">
-              <h3 className="text-sm font-medium">Máquinas</h3>
-            </div>
-            <div className="p-5">
-              <p className="text-4xl font-bold leading-tight">{total}</p>
-              <p className="opacity-90">Total registradas</p>
-            </div>
+      {/* Tarjetas de métricas */}
+      <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-xl bg-gradient-to-br from-fuchsia-600/70 to-purple-700/60 border border-fuchsia-500/30">
+          <div className="p-4">
+            <p className="text-sm opacity-80">Máquinas</p>
+            <p className="text-4xl font-bold mt-3">{total}</p>
+            <p className="opacity-80 mt-1">Total registradas</p>
           </div>
+        </div>
 
-          <div className="rounded-xl shadow-md text-white bg-gradient-to-r from-blue-600 to-blue-500">
-            <div className="p-4 border-b border-white/20">
-              <h3 className="text-sm font-medium">Activas</h3>
-            </div>
-            <div className="p-5">
-              <p className="text-4xl font-bold leading-tight">{activas}</p>
-              <p className="opacity-90">En operación</p>
-            </div>
+        <div className="rounded-xl bg-gradient-to-br from-blue-600/70 to-sky-700/60 border border-blue-500/30">
+          <div className="p-4">
+            <p className="text-sm opacity-80">Activas</p>
+            <p className="text-4xl font-bold mt-3">{activas}</p>
+            <p className="opacity-80 mt-1">En operación</p>
           </div>
+        </div>
 
-          <div className="rounded-xl shadow-md text-white bg-gradient-to-r from-teal-600 to-teal-500">
-            <div className="p-4 border-b border-white/20">
-              <h3 className="text-sm font-medium">Estado</h3>
-            </div>
-            <div className="p-5">
-              <p className="text-4xl font-bold leading-tight">
-                {actividadPct}%
-              </p>
-              <p className="opacity-90">Actividad relativa</p>
-            </div>
+        <div className="rounded-xl bg-gradient-to-br from-emerald-600/70 to-teal-700/60 border border-emerald-500/30">
+          <div className="p-4">
+            <p className="text-sm opacity-80">Estado</p>
+            <p className="text-4xl font-bold mt-3">{actividad}%</p>
+            <p className="opacity-80 mt-1">Actividad relativa</p>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Tabla Novedades */}
-        <section className="rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950/60 backdrop-blur">
-          <div className="p-4 border-b border-neutral-800">
-            <h3 className="text-sm font-semibold text-neutral-200">
+      {/* Tabla de novedades */}
+      <section className="mt-8">
+        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur">
+          <div className="px-4 py-3 border-b border-white/10">
+            <h2 className="text-white/90 font-medium">
               Novedades (últimas máquinas)
-            </h3>
+            </h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-neutral-900/80 sticky top-0 backdrop-blur z-10">
-                <tr className="[&_th]:text-left [&_th]:px-4 [&_th]:py-3 [&_th]:text-neutral-200">
-                  <th>Nombre</th>
-                  <th>Estado</th>
-                  <th>Tarifa diaria</th>
-                  <th>Creada</th>
-                  <th className="text-right pr-6">Acción</th>
+              <thead className="bg-white/5 text-left text-gray-300">
+                <tr>
+                  <th className="p-3 font-medium">Nombre</th>
+                  <th className="p-3 font-medium">Estado</th>
+                  <th className="p-3 font-medium">Tarifa diaria</th>
+                  <th className="p-3 font-medium">Creada</th>
+                  <th className="p-3 font-medium text-right">Acción</th>
                 </tr>
               </thead>
-
-              <tbody className="[&_td]:px-4 [&_td]:py-3">
+              <tbody className="[&_td]:p-3 [&_td]:text-gray-200">
                 {ultimas.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="text-neutral-400 px-4 py-6 text-center"
-                    >
+                    <td colSpan={5} className="text-gray-500 p-4">
                       Sin datos por ahora.
                     </td>
                   </tr>
                 )}
 
-                {ultimas.map((m, i) => (
-                  <tr
-                    key={m.id}
-                    className={`${
-                      i % 2 === 0 ? "bg-neutral-900/30" : "bg-neutral-900/10"
-                    } hover:bg-neutral-800/40 transition-colors border-t border-neutral-850`}
-                  >
-                    <td className="font-medium text-neutral-50">
-                      {m.name ?? "-"}
+                {ultimas.map((m) => (
+                  <tr key={m.id} className="border-t border-white/5">
+                    <td className="font-medium">{m.name ?? "-"}</td>
+                    <td>
+                      <StatusBadge status={m.status} />
                     </td>
-                    <td className="capitalize text-neutral-200">
-                      {m.status ?? "-"}
-                    </td>
-                    <td className="text-neutral-200">
-                      {m.daily_rate ?? "-"}
-                    </td>
-                    <td className="text-neutral-200">
-                      {m.created_at ? fmt.format(new Date(m.created_at)) : "-"}
-                    </td>
-                    <td className="text-right pr-6">
-                      <a
+                    <td>{fmtMoney(m.daily_rate)}</td>
+                    <td>{fmtDate(m.created_at)}</td>
+                    <td className="text-right">
+                      <Link
                         href={`/machines/${m.id}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-blue-500/40 px-3 py-1 text-blue-300 hover:text-white hover:bg-blue-600/20 transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white text-xs transition-colors"
                       >
-                        Ver
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          width="16"
-                          height="16"
-                          fill="currentColor"
-                        >
-                          <path d="M13 5l7 7-7 7v-4H4v-6h9V5z" />
-                        </svg>
-                      </a>
+                        Ver <span aria-hidden>➜</span>
+                      </Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
-      </div>
-    </div>
+        </div>
+      </section>
+    </main>
   );
 }
