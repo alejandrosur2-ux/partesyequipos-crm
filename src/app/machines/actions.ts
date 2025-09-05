@@ -13,7 +13,6 @@ export async function deleteMachine(formData: FormData) {
   const { error } = await sb.from("machines").delete().eq("id", id);
 
   if (error) {
-    // Propaga para que el boundary lo capture en dev
     throw new Error(`No se pudo eliminar la máquina: ${error.message}`);
   }
 
