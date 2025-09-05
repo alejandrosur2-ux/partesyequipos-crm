@@ -26,7 +26,6 @@ export default async function MachinesPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      // Renderizamos sin romper SSR
       console.error("Error cargando máquinas:", error.message);
       machines = [];
     } else {
@@ -72,9 +71,7 @@ export default async function MachinesPage() {
                   {m.daily_rate != null ? `$${m.daily_rate}` : "—"}
                 </td>
                 <td className="p-3">
-                  {m.created_at
-                    ? new Date(m.created_at).toLocaleString()
-                    : "—"}
+                  {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
                 </td>
                 <td className="p-3">
                   <div className="flex items-center justify-end gap-2">
@@ -105,7 +102,6 @@ export default async function MachinesPage() {
             {machines.length === 0 && (
               <tr>
                 <td className="p-4 text-gray-400" colSpan={6}>
-                  {/** mensaje amable cuando no hay datos */}
                   No hay máquinas registradas todavía.
                 </td>
               </tr>
