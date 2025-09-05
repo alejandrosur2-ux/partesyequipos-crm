@@ -15,8 +15,7 @@ export default function MachinesAddsBar({ data }: { data: Item[] }) {
 
   return (
     <div className="w-full">
-      {/* Área de barras */}
-      <div className="h-56 w-full flex items-end gap-3 p-4 border border-gray-200 rounded-lg">
+      <div className="h-56 w-full flex items-end gap-3 p-4 border border-gray-200 rounded-lg bg-white">
         {data.map((d, i) => {
           const h = Math.round(((d.total || 0) / max) * 100);
           return (
@@ -35,7 +34,6 @@ export default function MachinesAddsBar({ data }: { data: Item[] }) {
         })}
       </div>
 
-      {/* Eje Y sencillo */}
       <div className="flex justify-between text-xs text-gray-500 px-1 mt-2">
         <span>0</span>
         <span>{max}</span>
