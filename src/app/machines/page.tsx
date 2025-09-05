@@ -3,8 +3,10 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteMachine } from "./actions";
 
-/** Fuerza runtime Node (importante con Supabase) */
+/** Muy importante con lecturas dinámicas y server actions */
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Machine = {
   id: string;
@@ -14,6 +16,18 @@ type Machine = {
   daily_rate: number | null;
   created_at: string | null;
 };
+
+function safeMoney(n: number | null | undefined) {
+  return typeof n === "number" ? `$${n}` : "—";
+}
+function safeText(v: unknown) {
+  return (typeof v === "string" && v.trim().length > 0) ? v : "—";
+}
+function safeDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
 
 export default async function MachinesPage() {
   const sb = supabaseServer();
@@ -26,13 +40,13 @@ export default async function MachinesPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error cargando máquinas:", error.message);
+      console.error("[machines] supabase error:", error.message);
       machines = [];
     } else {
-      machines = data ?? [];
+      machines = Array.isArray(data) ? data : [];
     }
   } catch (e) {
-    console.error("Excepción cargando máquinas:", e);
+    console.error("[machines] exception:", e);
     machines = [];
   }
 
@@ -62,21 +76,17 @@ export default async function MachinesPage() {
           </thead>
 
           <tbody className="[&_tr]:border-t [&_tr]:border-white/10">
-            {machines.map((m) => (
+            {(machines ?? []).map((m) => (
               <tr key={m.id} className="hover:bg-white/5">
-                <td className="p-3">{m.name ?? "—"}</td>
-                <td className="p-3">{m.serial ?? "—"}</td>
-                <td className="p-3 capitalize">{m.status ?? "—"}</td>
-                <td className="p-3">
-                  {m.daily_rate != null ? `$${m.daily_rate}` : "—"}
-                </td>
-                <td className="p-3">
-                  {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
-                </td>
+                <td className="p-3">{safeText(m.name)}</td>
+                <td className="p-3">{safeText(m.serial)}</td>
+                <td className="p-3 capitalize">{safeText(m.status)}</td>
+                <td className="p-3">{safeMoney(m.daily_rate)}</td>
+                <td className="p-3">{safeDate(m.created_at)}</td>
                 <td className="p-3">
                   <div className="flex items-center justify-end gap-2">
                     <Link
-                      href={`/machines/${m.id}`}
+                      href={`/machines/${encodeURIComponent(m.id)}`}
                       className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
                     >
                       Ver →
@@ -99,7 +109,7 @@ export default async function MachinesPage() {
               </tr>
             ))}
 
-            {machines.length === 0 && (
+            {(machines ?? []).length === 0 && (
               <tr>
                 <td className="p-4 text-gray-400" colSpan={6}>
                   No hay máquinas registradas todavía.
