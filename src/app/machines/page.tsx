@@ -16,13 +16,12 @@ type Machine = {
 export async function deleteMachine(formData: FormData) {
   "use server";
   const id = formData.get("id") as string;
-
   if (!id) return;
 
   const sb = supabaseServer();
   await sb.from("machines").delete().eq("id", id);
 
-  // Refresca listado y dashboard
+  // Refrescar páginas relacionadas
   revalidatePath("/machines");
   revalidatePath("/dashboard");
 }
@@ -30,10 +29,13 @@ export async function deleteMachine(formData: FormData) {
 export default async function MachinesPage() {
   const sb = supabaseServer();
 
-  const { data: machines = [] } = await sb
+  const { data, error } = await sb
     .from("machines")
-    .select("*")
+    .select("id,name,serial,status,daily_rate,created_at")
     .order("created_at", { ascending: false });
+
+  // Asegura que siempre sea un array
+  const machines: Machine[] = data ?? [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 text-white">
