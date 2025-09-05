@@ -1,7 +1,10 @@
 // src/app/machines/page.tsx
-import { supabaseServer } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { supabaseServer } from "@/lib/supabase/server";
+import { deleteMachine } from "./actions";
+
+/** Fuerza runtime Node (importante con Supabase) */
+export const runtime = "nodejs";
 
 type Machine = {
   id: string;
@@ -12,30 +15,27 @@ type Machine = {
   created_at: string | null;
 };
 
-// --- Server Action: eliminar máquina ---
-export async function deleteMachine(formData: FormData) {
-  "use server";
-  const id = formData.get("id") as string;
-  if (!id) return;
-
-  const sb = supabaseServer();
-  await sb.from("machines").delete().eq("id", id);
-
-  // Refrescar páginas relacionadas
-  revalidatePath("/machines");
-  revalidatePath("/dashboard");
-}
-
 export default async function MachinesPage() {
   const sb = supabaseServer();
 
-  const { data, error } = await sb
-    .from("machines")
-    .select("id,name,serial,status,daily_rate,created_at")
-    .order("created_at", { ascending: false });
+  let machines: Machine[] = [];
+  try {
+    const { data, error } = await sb
+      .from("machines")
+      .select("id,name,serial,status,daily_rate,created_at")
+      .order("created_at", { ascending: false });
 
-  // Asegura que siempre sea un array
-  const machines: Machine[] = data ?? [];
+    if (error) {
+      // Renderizamos sin romper SSR
+      console.error("Error cargando máquinas:", error.message);
+      machines = [];
+    } else {
+      machines = data ?? [];
+    }
+  } catch (e) {
+    console.error("Excepción cargando máquinas:", e);
+    machines = [];
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 text-white">
@@ -63,7 +63,7 @@ export default async function MachinesPage() {
           </thead>
 
           <tbody className="[&_tr]:border-t [&_tr]:border-white/10">
-            {machines.map((m: Machine) => (
+            {machines.map((m) => (
               <tr key={m.id} className="hover:bg-white/5">
                 <td className="p-3">{m.name ?? "—"}</td>
                 <td className="p-3">{m.serial ?? "—"}</td>
@@ -78,7 +78,6 @@ export default async function MachinesPage() {
                 </td>
                 <td className="p-3">
                   <div className="flex items-center justify-end gap-2">
-                    {/* Ver */}
                     <Link
                       href={`/machines/${m.id}`}
                       className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
@@ -86,7 +85,6 @@ export default async function MachinesPage() {
                       Ver →
                     </Link>
 
-                    {/* Eliminar */}
                     <form action={deleteMachine}>
                       <input type="hidden" name="id" value={m.id} />
                       <button
@@ -107,6 +105,7 @@ export default async function MachinesPage() {
             {machines.length === 0 && (
               <tr>
                 <td className="p-4 text-gray-400" colSpan={6}>
+                  {/** mensaje amable cuando no hay datos */}
                   No hay máquinas registradas todavía.
                 </td>
               </tr>
