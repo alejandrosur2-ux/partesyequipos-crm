@@ -1,23 +1,13 @@
+// src/lib/supabase/server-only.ts
 import "server-only";
-import { cookies } from "next/headers";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
-export function createClient() {
-  const cookieStore = cookies(); // Next.js 15 devuelve una Promise
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: async (name: string) => (await cookieStore).get(name)?.value,
-        set: async (name: string, value: string, options: CookieOptions) => {
-          (await cookieStore).set({ name, value, ...options });
-        },
-        remove: async (name: string, options: CookieOptions) => {
-          (await cookieStore).set({ name, value: "", ...options });
-        },
-      },
-    }
-  );
+export function supabaseServer() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Cliente de servidor sin cookies (perfecto para API Routes / server components)
+  return createClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { "x-client-info": "server" } },
+  });
 }
