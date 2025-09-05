@@ -30,12 +30,15 @@ export default async function DashboardPage() {
   const activas: number = activeCount ?? 0;
 
   // Últimas máquinas
-  const { data: ultimas = [], error: lastErr } = await sb
+  const { data: ultimasRaw, error: lastErr } = await sb
     .from("machines")
     .select("id,name,status,daily_rate,created_at")
     .order("created_at", { ascending: false })
     .limit(10);
   if (lastErr) console.error("Error latest machines:", lastErr);
+
+  // NORMALIZACIÓN: garantizamos array no-nulo
+  const ultimas: MachineRow[] = (ultimasRaw ?? []) as MachineRow[];
 
   const actividadPct = total > 0 ? Math.round((activas / total) * 100) : 0;
 
@@ -111,7 +114,7 @@ export default async function DashboardPage() {
                   </tr>
                 )}
 
-                {ultimas.map((m: MachineRow) => (
+                {ultimas.map((m) => (
                   <tr key={m.id} className="border-t hover:bg-gray-50">
                     <td className="font-medium">{m.name ?? "-"}</td>
                     <td className="capitalize">{m.status ?? "-"}</td>
