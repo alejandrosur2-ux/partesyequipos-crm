@@ -1,3 +1,5 @@
+"use client";
+
 // src/app/machines/new/page.tsx
 import { createMachine } from "../actions";
 import { useFormState, useFormStatus } from "react-dom";
@@ -17,9 +19,17 @@ function SubmitButton() {
   );
 }
 
+type ActionState =
+  | { ok: true; id: string }
+  | { ok: false; message: string }
+  | null;
+
 export default function NewMachinePage() {
   const router = useRouter();
-  const [state, formAction] = useFormState(createMachine as any, null);
+  const [state, formAction] = useFormState(createMachine as any, null) as [
+    ActionState,
+    (formData: FormData) => void
+  ];
 
   // Redirige al detalle si se creó OK
   useEffect(() => {
