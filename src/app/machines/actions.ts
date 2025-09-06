@@ -60,3 +60,39 @@ export async function updateMachine(formData: FormData) {
 
   redirect(`/machines/${id}`);
 }
+// --- al final de src/app/machines/actions.ts ---
+
+/** Crear máquina */
+export async function createMachine(formData: FormData) {
+  const sb = supabaseServer();
+
+  // aceptamos español/inglés en nombres de campos
+  const get = (a: string, b?: string) =>
+    String((formData.get(a) ?? (b ? formData.get(b) : "")) || "").trim() || null;
+
+  const record = {
+    name: get("name", "nombre"),
+    serial: get("serial", "serie"),
+    brand: get("brand", "marca"),
+    model: get("model", "modelo"),
+    status: get("status", "estado"),
+    location: get("location", "ubicacion"),
+  };
+
+  const { error, data } = await sb.from("machines").insert(record).select("id").single();
+
+  // revalidamos las rutas relacionadas
+  revalidatePath("/machines");
+  revalidatePath("/dashboard");
+
+  if (error) {
+    throw new Error(`Error creando máquina: ${error.message}`);
+  }
+
+  // vamos directo a la ficha recién creada
+  if (data?.id) {
+    redirect(`/machines/${data.id}`);
+  } else {
+    redirect("/machines");
+  }
+}
