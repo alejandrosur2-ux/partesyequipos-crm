@@ -1,37 +1,45 @@
 // src/app/machines/[id]/page.tsx
+import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import MachineEditForm from "./MachineEditForm";
 
-type Props = { params: { id: string } };
+type PageProps = {
+  params: Promise<{ id: string }>; // Next 15
+};
 
-export default async function MachineDetailPage({ params }: Props) {
-  const { id } = params;
-  const sb = supabaseServer();
-  const { data, error } = await sb
+export const runtime = "nodejs";
+
+export default async function MachineDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const supabase = supabaseServer();
+
+  const { data: machine, error } = await supabase
     .from("machines")
-    .select("id, code, name, serial, brand, model, status, location, created_at")
+    .select("id, name, brand, model, serial, status_enum")
     .eq("id", id)
     .single();
 
-  if (error || !data) {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold mb-4">Máquina</h1>
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
-          {error ? error.message : "No encontrada"}
-        </div>
-      </div>
-    );
+  if (error || !machine) {
+    // Si no existe, vuelve a listado
+    redirect("/machines");
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Editar máquina</h1>
-        <p className="text-white/60 text-sm">ID: {data.id}</p>
-      </div>
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Editar máquina</h1>
 
-      <MachineEditForm machine={data} />
+      <div className="bg-white rounded-lg shadow p-6">
+        <MachineEditForm
+          id={machine.id}
+          initial={{
+            name: machine.name ?? "",
+            brand: machine.brand ?? "",
+            model: machine.model ?? "",
+            serial: machine.serial ?? "",
+            status_enum: machine.status_enum ?? "disponible",
+          }}
+        />
+      </div>
     </div>
   );
 }
