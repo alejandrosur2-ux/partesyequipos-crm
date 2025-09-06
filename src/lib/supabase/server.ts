@@ -1,9 +1,9 @@
 // src/lib/supabase/server.ts
-// Adaptador para mantener compatibilidad con import { supabaseServer } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js";
 
-import { createClient } from "./server-only";
-
-// Si tu helper original se llama distinto, ajusta aquí:
 export function supabaseServer() {
-  return createClient();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Cliente simple para consultas desde el server (RSC / rutas API)
+  return createClient(url, key, { auth: { persistSession: false } });
 }
