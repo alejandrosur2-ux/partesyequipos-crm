@@ -1,21 +1,23 @@
 // src/app/machines/actions.ts
-"use server";
+'use server';
 
-import { supabaseServer } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from 'next/cache';
+import { supabaseServer } from '@/lib/supabase/server';
 
-/** Elimina una máquina por id y revalida páginas relacionadas */
+/** Eliminar máquina por id */
 export async function deleteMachine(formData: FormData) {
-  const id = formData.get("id") as string | null;
-  if (!id) return;
+  const id = formData.get('id') as string | null;
+  if (!id) return { ok: false, error: 'Falta id' };
 
   const sb = supabaseServer();
-  const { error } = await sb.from("machines").delete().eq("id", id);
+  const { error } = await sb.from('machines').delete().eq('id', id);
 
   if (error) {
-    throw new Error(`No se pudo eliminar la máquina: ${error.message}`);
+    return { ok: false, error: error.message };
   }
 
-  revalidatePath("/machines");
-  revalidatePath("/dashboard");
+  // Revalidar páginas relacionadas
+  revalidatePath('/machines');
+  revalidatePath('/dashboard');
+  return { ok: true };
 }
