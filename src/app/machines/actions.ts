@@ -1,61 +1,49 @@
-// src/app/machines/actions.ts
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
-/** Crear máquina */
-export async function createMachine(formData: FormData) {
-  const sb = supabaseServer();
+type ActionState =
+  | { ok: true; id: string }
+  | { ok: false; message: string };
 
-  const payload = {
-    name: (formData.get("name") as string) || null,
-    serial: (formData.get("serial") as string) || null,
-    brand: (formData.get("brand") as string) || null,
-    model: (formData.get("model") as string) || null,
-    status: (formData.get("status") as string) || null,
-    location: (formData.get("location") as string) || null,
-  };
+export async function createMachine(
+  _prevState: ActionState | null,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const sb = supabaseServer();
 
-  const { data, error } = await sb.from("machines").insert(payload).select("id").single();
-  if (error) throw new Error("Error al crear máquina: " + error.message);
+    const name = (formData.get("name") || "").toString().trim();
+    const serial = (formData.get("serial") || "").toString().trim();
+    const brand = (formData.get("brand") || "").toString().trim();
+    const model = (formData.get("model") || "").toString().trim();
+    const status = (formData.get("status") || "").toString().trim();
+    const location = (formData.get("location") || "").toString().trim();
 
-  revalidatePath("/machines");
-  redirect(`/machines/${data.id}`); // al detalle recién creada
-}
+    // Validación mínima para evitar nulls raros
+    if (!name) {
+      return { ok: false, message: "El nombre es obligatorio." };
+    }
 
-/** Actualizar máquina */
-export async function updateMachine(formData: FormData) {
-  const sb = supabaseServer();
+    const { data, error } = await sb
+      .from("machines")
+      .insert([{ name, serial, brand, model, status, location }])
+      .select("id")
+      .single();
 
-  const id = formData.get("id") as string;
-  if (!id) throw new Error("Falta id");
+    if (error) {
+      return { ok: false, message: `Supabase: ${error.message}` };
+    }
 
-  const payload = {
-    name: (formData.get("name") as string) || null,
-    serial: (formData.get("serial") as string) || null,
-    brand: (formData.get("brand") as string) || null,
-    model: (formData.get("model") as string) || null,
-    status: (formData.get("status") as string) || null,
-    location: (formData.get("location") as string) || null,
-  };
+    if (!data?.id) {
+      return { ok: false, message: "No se recibió el ID creado." };
+    }
 
-  const { error } = await sb.from("machines").update(payload).eq("id", id);
-  if (error) throw new Error("Error al actualizar: " + error.message);
-
-  revalidatePath("/machines");
-  revalidatePath(`/machines/${id}`);
-}
-
-/** Eliminar máquina */
-export async function deleteMachine(formData: FormData) {
-  const sb = supabaseServer();
-  const id = formData.get("id") as string;
-  if (!id) throw new Error("Falta id");
-
-  const { error } = await sb.from("machines").delete().eq("id", id);
-  if (error) throw new Error("Error al eliminar: " + error.message);
-
-  revalidatePath("/machines");
+    return { ok: true, id: data.id };
+  } catch (e: any) {
+    return {
+      ok: false,
+      message: e?.message ?? "Error inesperado creando la máquina.",
+    };
+  }
 }
