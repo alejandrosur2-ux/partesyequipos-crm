@@ -35,7 +35,7 @@ export default function MachineEditForm({ id, initial }: Props) {
           brand: form.brand?.trim() || null,
           model: form.model?.trim() || null,
           serial: form.serial?.trim() || null,
-          status: form.status_enum, // 👈 viene del select
+          status: form.status_enum,
         }),
       });
 
@@ -44,7 +44,6 @@ export default function MachineEditForm({ id, initial }: Props) {
         throw new Error(data?.error || "No se pudo guardar");
       }
 
-      // Vuelve al listado
       router.push("/machines");
       router.refresh();
     } catch (err: any) {
@@ -54,13 +53,19 @@ export default function MachineEditForm({ id, initial }: Props) {
     }
   }
 
+  const labelCls = "block text-sm font-medium text-gray-700";
+  const inputCls =
+    "w-full border border-gray-300 p-2 rounded text-gray-900 placeholder-gray-500 bg-white";
+  const selectCls =
+    "w-full border border-gray-300 p-2 rounded text-gray-900 bg-white";
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium">Nombre</label>
+          <label className={labelCls}>Nombre</label>
           <input
-            className="w-full border p-2 rounded"
+            className={inputCls}
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             placeholder="Ej. Retro 25"
@@ -68,9 +73,9 @@ export default function MachineEditForm({ id, initial }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Marca</label>
+          <label className={labelCls}>Marca</label>
           <input
-            className="w-full border p-2 rounded"
+            className={inputCls}
             value={form.brand}
             onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
             placeholder="Ej. XCMG"
@@ -78,9 +83,9 @@ export default function MachineEditForm({ id, initial }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Modelo</label>
+          <label className={labelCls}>Modelo</label>
           <input
-            className="w-full border p-2 rounded"
+            className={inputCls}
             value={form.model}
             onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
             placeholder="Ej. XS123"
@@ -88,24 +93,27 @@ export default function MachineEditForm({ id, initial }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Serie</label>
+          <label className={labelCls}>Serie</label>
           <input
-            className="w-full border p-2 rounded"
+            className={inputCls}
             value={form.serial}
-            onChange={(e) => setForm((f) => ({ ...f, serial: e.target.value }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, serial: e.target.value }))
+            }
             placeholder="Ej. 000123"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Estado</label>
+          <label className={labelCls}>Estado</label>
           <select
-            className="w-full border p-2 rounded"
+            className={selectCls}
             value={form.status_enum}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
-                status_enum: e.target.value as Props["initial"]["status_enum"],
+                status_enum: e.target
+                  .value as Props["initial"]["status_enum"],
               }))
             }
           >
@@ -127,7 +135,7 @@ export default function MachineEditForm({ id, initial }: Props) {
 
         <button
           type="button"
-          className="px-4 py-2 rounded border"
+          className="px-4 py-2 rounded border border-gray-300 text-gray-900 bg-white"
           onClick={() => router.push("/machines")}
           disabled={saving}
         >
