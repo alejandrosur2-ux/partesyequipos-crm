@@ -1,139 +1,147 @@
-// src/app/machines/[id]/MachineEditForm.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+// src/app/machines/[id]/MachineEditForm.tsx
+import { useFormState, useFormStatus } from "react-dom";
+import { updateMachine, deleteMachine } from "../actions";
+import { useRouter } from "next/navigation";
 
 type Machine = {
   id: string;
+  code: string;
   name: string | null;
   serial: string | null;
+  brand: string | null;
+  model: string | null;
   status: string | null;
-  daily_rate: number | null;
-  notes: string | null;
+  location: string | null;
 };
 
-export default function MachineEditForm({
-  machine,
-  action,
-}: {
-  machine: Machine;
-  action: (formData: FormData) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
+function SaveButton() {
+  const { pending } = useFormStatus();
   return (
-    <div>
-      {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 text-white transition-colors"
-        >
-          Editar
-        </button>
-      ) : (
-        <form
-          action={(fd) => {
-            startTransition(async () => {
-              await action(fd);
-            });
-          }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          {/* Columna 1 */}
-          <div className="space-y-4">
-            <Field label="Nombre">
-              <input
-                name="name"
-                defaultValue={machine.name ?? ""}
-                className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20"
-                placeholder="Nombre de la máquina"
-              />
-            </Field>
-
-            <Field label="Serie">
-              <input
-                name="serial"
-                defaultValue={machine.serial ?? ""}
-                className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20"
-                placeholder="Serie / código"
-              />
-            </Field>
-
-            <Field label="Estado">
-              <select
-                name="status"
-                defaultValue={machine.status ?? "activo"}
-                className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-              >
-                <option value="activo">Activo</option>
-                <option value="taller">Taller</option>
-                <option value="rentada">Rentada</option>
-                <option value="baja">Baja</option>
-              </select>
-            </Field>
-
-            <Field label="Tarifa diaria (GTQ)">
-              <input
-                name="daily_rate"
-                type="number"
-                step="1"
-                min="0"
-                defaultValue={machine.daily_rate ?? ""}
-                className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20"
-                placeholder="Ej: 950"
-              />
-            </Field>
-          </div>
-
-          {/* Columna 2 */}
-          <div className="space-y-4">
-            <Field label="Observaciones">
-              <textarea
-                name="notes"
-                defaultValue={machine.notes ?? ""}
-                rows={8}
-                className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20"
-                placeholder="Notas u observaciones…"
-              />
-            </Field>
-          </div>
-
-          {/* Acciones */}
-          <div className="md:col-span-2 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="px-4 py-2 rounded-md bg-emerald-600/80 hover:bg-emerald-600 text-white transition-colors disabled:opacity-60"
-            >
-              {isPending ? "Guardando…" : "Guardar cambios"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="px-4 py-2 rounded-md bg-white/10 hover:bg-white/15 text-white transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
+    <button
+      type="submit"
+      className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+      disabled={pending}
+    >
+      {pending ? "Guardando..." : "Guardar cambios"}
+    </button>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+export default function MachineEditForm({ machine }: { machine: Machine }) {
+  const router = useRouter();
+  const [state, formAction] = useFormState(updateMachine as any, null);
+
   return (
-    <label className="block">
-      <span className="mb-1 block text-sm text-gray-300">{label}</span>
-      {children}
-    </label>
+    <div className="space-y-6">
+      {state && "ok" in state && !state.ok && (
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
+          {state.message}
+        </div>
+      )}
+
+      <form action={formAction} className="space-y-4 bg-white/5 p-5 rounded-lg border border-white/10">
+        <input type="hidden" name="id" value={machine.id} />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-sm text-white/80">Código *</span>
+            <input
+              name="code"
+              defaultValue={machine.code}
+              required
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-white/80">Nombre *</span>
+            <input
+              name="name"
+              defaultValue={machine.name ?? ""}
+              required
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-white/80">Serie</span>
+            <input
+              name="serial"
+              defaultValue={machine.serial ?? ""}
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-white/80">Marca</span>
+            <input
+              name="brand"
+              defaultValue={machine.brand ?? ""}
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-white/80">Modelo</span>
+            <input
+              name="model"
+              defaultValue={machine.model ?? ""}
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-white/80">Estado</span>
+            <input
+              name="status"
+              defaultValue={machine.status ?? ""}
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="text-sm text-white/80">Ubicación</span>
+            <input
+              name="location"
+              defaultValue={machine.location ?? ""}
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <SaveButton />
+
+          {/* eliminar desde la ficha */}
+          <form
+            action={async (fd) => {
+              // encadenamos a la server action delete
+              await deleteMachine(fd);
+            }}
+          >
+            <input type="hidden" name="id" value={machine.id} />
+            <button
+              type="submit"
+              className="px-3 py-2 rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10"
+              onClick={(e) => {
+                if (!confirm("¿Eliminar esta máquina?")) e.preventDefault();
+              }}
+            >
+              Eliminar
+            </button>
+          </form>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-md border border-white/15 hover:bg-white/10"
+            onClick={() => router.push("/machines")}
+          >
+            Volver
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
