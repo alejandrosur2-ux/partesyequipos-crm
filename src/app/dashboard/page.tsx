@@ -2,158 +2,163 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 
-/** Tipado mínimo para la tabla de máquinas */
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
+// ------- utilidades locales (sin archivo extra) -------
+const fmtQ = (n: number | null | undefined) => `Q ${Number(n ?? 0).toFixed(2)}`;
+const since = (iso?: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const ms = Date.now() - d.getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "justo ahora";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h`;
+  const dxy = Math.floor(h / 24);
+  return `${dxy} d`;
+};
+// ------------------------------------------------------
+
 type Machine = {
   id: string;
   name: string | null;
+  serial: string | null;
   status: string | null;
   daily_rate: number | null;
   created_at: string | null;
 };
 
-/** Helpers de formato (moneda y fecha) */
-const fmtMoney = (n: number | null | undefined) =>
-  typeof n === "number"
-    ? new Intl.NumberFormat("es-GT", {
-        style: "currency",
-        currency: "GTQ",
-        maximumFractionDigits: 0,
-      }).format(n) + " / día"
-    : "-";
-
-const fmtDate = (iso: string | null | undefined) =>
-  iso
-    ? new Intl.DateTimeFormat("es-GT", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(new Date(iso))
-    : "-";
-
-/** Badge de estado */
-function StatusBadge({ status }: { status: string | null }) {
-  const s = (status ?? "").toLowerCase();
-  const isActive = s === "activo" || s === "active";
-  const badgeClass = isActive
-    ? "bg-green-500/20 text-green-400"
-    : "bg-gray-500/20 text-gray-300";
-  const label = status ?? "-";
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
-      {label}
-    </span>
-  );
-}
-
 export default async function DashboardPage() {
   const sb = supabaseServer();
 
-  // Conteos
-  const { count: totalCount } = await sb
+  const { count: totalRaw } = await sb
     .from("machines")
-    .select("id", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true });
 
-  const { count: activeCount } = await sb
+  const { count: actRaw } = await sb
     .from("machines")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["activo", "active"]);
+    .select("*", { count: "exact", head: true })
+    .eq("status", "active");
 
-  const total = totalCount ?? 0;
-  const activas = activeCount ?? 0;
+  const total = totalRaw ?? 0;
+  const activas = actRaw ?? 0;
   const actividad = total > 0 ? Math.round((activas / total) * 100) : 0;
 
-  // Últimas máquinas (7)
-  const { data: ultimasData } = await sb
+  const { data: ultimasRaw } = await sb
     .from("machines")
-    .select("id, name, status, daily_rate, created_at")
+    .select("id,name,serial,status,daily_rate,created_at")
     .order("created_at", { ascending: false })
-    .limit(7);
+    .limit(5);
 
-  const ultimas: Machine[] = Array.isArray(ultimasData) ? ultimasData : [];
+  const ultimas: Machine[] = ultimasRaw ?? [];
 
   return (
-    <main className="p-6 md:p-8 max-w-7xl mx-auto">
-      <h1 className="text-2xl md:text-3xl font-semibold text-white">Dashboard</h1>
-      <p className="text-gray-400 mt-1">Resumen rápido de tus máquinas.</p>
+    <main className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+            Panel general
+          </h1>
+          <Link
+            href="/machines/new"
+            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
+          >
+            + Nueva máquina
+          </Link>
+        </header>
 
-      {/* Tarjetas de métricas */}
-      <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-xl bg-gradient-to-br from-fuchsia-600/70 to-purple-700/60 border border-fuchsia-500/30">
-          <div className="p-4">
-            <p className="text-sm opacity-80">Máquinas</p>
-            <p className="text-4xl font-bold mt-3">{total}</p>
-            <p className="opacity-80 mt-1">Total registradas</p>
+        {/* KPIs */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-white/10 bg-gray-900/60 p-5">
+            <p className="text-sm text-gray-300">Máquinas totales</p>
+            <p className="mt-1 text-3xl font-bold">{total}</p>
           </div>
-        </div>
-
-        <div className="rounded-xl bg-gradient-to-br from-blue-600/70 to-sky-700/60 border border-blue-500/30">
-          <div className="p-4">
-            <p className="text-sm opacity-80">Activas</p>
-            <p className="text-4xl font-bold mt-3">{activas}</p>
-            <p className="opacity-80 mt-1">En operación</p>
+          <div className="rounded-xl border border-white/10 bg-gray-900/60 p-5">
+            <p className="text-sm text-gray-300">Activas</p>
+            <p className="mt-1 text-3xl font-bold">{activas}</p>
           </div>
-        </div>
-
-        <div className="rounded-xl bg-gradient-to-br from-emerald-600/70 to-teal-700/60 border border-emerald-500/30">
-          <div className="p-4">
-            <p className="text-sm opacity-80">Estado</p>
-            <p className="text-4xl font-bold mt-3">{actividad}%</p>
-            <p className="opacity-80 mt-1">Actividad relativa</p>
+          <div className="rounded-xl border border-white/10 bg-gray-900/60 p-5">
+            <p className="text-sm text-gray-300">Actividad</p>
+            <p className="mt-1 text-3xl font-bold">{actividad}%</p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Tabla de novedades */}
-      <section className="mt-8">
-        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur">
-          <div className="px-4 py-3 border-b border-white/10">
-            <h2 className="text-white/90 font-medium">
-              Novedades (últimas máquinas)
-            </h2>
+        {/* Novedades / Últimas máquinas */}
+        <section className="rounded-xl border border-white/10 bg-gray-900/60 overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+            <h2 className="text-lg font-medium">Novedades · últimas máquinas</h2>
+            <Link
+              href="/machines"
+              className="text-sm underline-offset-4 hover:underline text-gray-300"
+            >
+              Ver todas
+            </Link>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-white/5 text-left text-gray-300">
-                <tr>
-                  <th className="p-3 font-medium">Nombre</th>
-                  <th className="p-3 font-medium">Estado</th>
-                  <th className="p-3 font-medium">Tarifa diaria</th>
-                  <th className="p-3 font-medium">Creada</th>
-                  <th className="p-3 font-medium text-right">Acción</th>
+              <thead className="bg-gray-900/70">
+                <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-left text-gray-200">
+                  <th>Nombre</th>
+                  <th>Serie</th>
+                  <th>Estado</th>
+                  <th>Tarifa</th>
+                  <th>Creada</th>
+                  <th className="text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="[&_td]:p-3 [&_td]:text-gray-200">
+              <tbody className="[&>tr]:border-t [&>tr]:border-white/10">
                 {ultimas.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-gray-500 p-4">
+                    <td colSpan={6} className="px-4 py-6 text-center text-gray-300">
                       Sin datos por ahora.
                     </td>
                   </tr>
                 )}
 
                 {ultimas.map((m) => (
-                  <tr key={m.id} className="border-t border-white/5">
-                    <td className="font-medium">{m.name ?? "-"}</td>
-                    <td>
-                      <StatusBadge status={m.status} />
-                    </td>
-                    <td>{fmtMoney(m.daily_rate)}</td>
-                    <td>{fmtDate(m.created_at)}</td>
-                    <td className="text-right">
-                      <Link
-                        href={`/machines/${m.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-white text-xs transition-colors"
+                  <tr key={m.id} className="hover:bg-white/5">
+                    <td className="px-4 py-3 text-gray-100">{m.name ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-200">{m.serial ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={[
+                          "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium",
+                          m.status === "active"
+                            ? "bg-emerald-600/20 text-emerald-200 border border-emerald-500/30"
+                            : "bg-amber-600/20 text-amber-200 border border-amber-500/30",
+                        ].join(" ")}
                       >
-                        Ver <span aria-hidden>➜</span>
-                      </Link>
+                        {m.status ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-200">{fmtQ(m.daily_rate)}</td>
+                    <td className="px-4 py-3 text-gray-300">{since(m.created_at)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2 justify-end">
+                        <Link
+                          href={`/machines/${m.id}`}
+                          className="rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 hover:bg-white/20 transition"
+                        >
+                          Ver
+                        </Link>
+                        <Link
+                          href={`/machines/${m.id}?edit=1`}
+                          className="rounded-lg border border-sky-400/30 text-sky-200 bg-sky-500/10 px-3 py-1.5 hover:bg-sky-500/20 transition"
+                        >
+                          Editar
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
