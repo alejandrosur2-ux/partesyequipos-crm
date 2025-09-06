@@ -31,7 +31,6 @@ export default function NewMachinePage() {
     (formData: FormData) => void
   ];
 
-  // Redirige al detalle si se creó OK
   useEffect(() => {
     if (state && "ok" in state && state.ok) {
       router.push(`/machines/${state.id}`);
@@ -42,7 +41,6 @@ export default function NewMachinePage() {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-6">Nueva máquina</h1>
 
-      {/* Mensaje de error si falló la acción (sin romper la app) */}
       {state && "ok" in state && !state.ok && (
         <div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
           {state.message}
@@ -51,6 +49,16 @@ export default function NewMachinePage() {
 
       <form action={formAction} className="space-y-4 bg-white/5 p-5 rounded-lg border border-white/10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-sm text-white/80">Código *</span>
+            <input
+              name="code"
+              required
+              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white placeholder-white/40"
+              placeholder="M-0001"
+            />
+          </label>
+
           <label className="block">
             <span className="text-sm text-white/80">Nombre *</span>
             <input
@@ -97,7 +105,7 @@ export default function NewMachinePage() {
             />
           </label>
 
-          <label className="block">
+          <label className="block md:col-span-2">
             <span className="text-sm text-white/80">Ubicación</span>
             <input
               name="location"
