@@ -1,95 +1,62 @@
 // src/app/machines/new/page.tsx
-import { createClient } from "@/lib/supabase/server-only";
+import { supabaseServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Banner from "@/components/Banner";
-import Link from "next/link";
 
-export default function NewMachinePage({
-  searchParams,
-}: {
-  searchParams: { err?: string };
-}) {
-  async function createAction(formData: FormData) {
-    "use server";
-    const sb = createClient();
+export const dynamic = "force-dynamic";
 
-    const name = String(formData.get("name") || "").trim();
-    const serial = String(formData.get("serial") || "").trim() || null;
-    const status = String(formData.get("status") || "activo");
-    const daily_rate = formData.get("daily_rate")
-      ? Number(formData.get("daily_rate"))
-      : null;
-
-    const statusAllowed = new Set(["activo", "taller", "rentada", "baja"]);
-    if (!name) return redirect("/machines/new?err=El nombre es obligatorio");
-    if (!statusAllowed.has(status))
-      return redirect("/machines/new?err=Estado inválido");
-
-    const { data, error } = await sb
-      .from("machines")
-      .insert({ name, serial, status, daily_rate })
-      .select("id")
-      .single();
-
-    if (error)
-      return redirect(`/machines/new?err=${encodeURIComponent(error.message)}`);
-
-    redirect(`/machines/${data.id}?msg=creada`);
-  }
-
+export default function NewMachinePage() {
   return (
-    <main className="p-6 max-w-xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Nueva máquina</h1>
-        <Link href="/machines" className="underline">
-          ← Volver
-        </Link>
-      </div>
+    <main className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-4">Nueva máquina</h1>
 
-      {searchParams.err && <Banner type="err">{searchParams.err}</Banner>}
-
-      <form action={createAction} className="space-y-3">
-        <label className="block">
-          <span className="text-sm">Nombre</span>
-          <input name="name" className="border p-2 w-full rounded" required />
-        </label>
-
-        <label className="block">
-          <span className="text-sm">Serie (opcional)</span>
-          <input name="serial" className="border p-2 w-full rounded" />
-        </label>
-
-        <label className="block">
-          <span className="text-sm">Estado</span>
-          <select
-            name="status"
-            defaultValue="activo"
-            className="border p-2 w-full rounded"
-          >
-            <option value="activo">activo</option>
-            <option value="taller">taller</option>
-            <option value="rentada">rentada</option>
-            <option value="baja">baja</option>
+      <form action={createMachine} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">Nombre</label>
+          <input name="name" className="w-full rounded border px-3 py-2 text-black" required />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Serie</label>
+          <input name="serial" className="w-full rounded border px-3 py-2 text-black" />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Estado</label>
+          <select name="status" className="w-full rounded border px-3 py-2 text-black">
+            <option value="active">Activa</option>
+            <option value="inactive">Inactiva</option>
+            <option value="maintenance">Mantenimiento</option>
           </select>
-        </label>
-
-        <label className="block">
-          <span className="text-sm">Tarifa diaria (opcional)</span>
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Tarifa diaria</label>
           <input
+            name="daily_rate"
             type="number"
             step="0.01"
-            name="daily_rate"
-            className="border p-2 w-full rounded"
+            className="w-full rounded border px-3 py-2 text-black"
+            defaultValue={0}
           />
-        </label>
-
+        </div>
         <button
           type="submit"
-          className="px-4 py-2 border rounded bg-blue-600 text-white"
+          className="rounded bg-blue-600 px-4 py-2 font-medium hover:bg-blue-500"
         >
-          Crear
+          Guardar
         </button>
       </form>
     </main>
   );
+}
+
+export async function createMachine(formData: FormData) {
+  "use server";
+  const sb = supabaseServer();
+  const payload = {
+    name: String(formData.get("name") ?? ""),
+    serial: String(formData.get("serial") ?? ""),
+    status: String(formData.get("status") ?? "active"),
+    daily_rate: Number(formData.get("daily_rate") ?? 0),
+  };
+  const { error } = await sb.from("machines").insert(payload);
+  if (error) throw new Error(error.message);
+  redirect("/machines");
 }
