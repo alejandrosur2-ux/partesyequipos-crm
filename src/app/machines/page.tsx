@@ -1,9 +1,11 @@
+// src/app/machines/page.tsx
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteMachine } from "./actions";
 
 type Machine = {
   id: string;
+  code: string;
   name: string | null;
   serial: string | null;
   brand: string | null;
@@ -12,88 +14,97 @@ type Machine = {
   location: string | null;
 };
 
-export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function MachinesPage() {
   const sb = supabaseServer();
-  const { data: machines, error } = await sb.from("machines").select("*").order("created_at", { ascending: false });
+  const { data, error } = await sb
+    .from("machines")
+    .select("id, code, name, serial, brand, model, status, location")
+    .order("created_at", { ascending: false });
 
   if (error) {
     return (
-      <main className="p-6">
-        <h1 className="text-xl font-bold">Máquinas</h1>
-        <p className="text-red-600 mt-4">Error al cargar máquinas: {error.message}</p>
-      </main>
+      <div className="p-6">
+        <h1 className="text-xl font-semibold mb-4">Máquinas</h1>
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
+          Error al cargar máquinas: {error.message}
+        </div>
+      </div>
     );
   }
 
+  const machines = (data || []) as Machine[];
+
   return (
-    <main className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-zinc-900">Máquinas</h1>
+    <div className="p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Máquinas</h1>
         <Link
           href="/machines/new"
-          className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white"
         >
-          + Nueva
+          Nueva máquina
         </Link>
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-zinc-200/60 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg border border-white/10">
         <table className="min-w-full text-sm">
-          <thead className="bg-zinc-50 text-left text-xs font-semibold uppercase text-zinc-500">
+          <thead className="bg-white/5 text-white/70">
             <tr>
-              <th className="p-3">Nombre</th>
-              <th className="p-3">Serie</th>
-              <th className="p-3">Marca</th>
-              <th className="p-3">Modelo</th>
-              <th className="p-3">Estado</th>
-              <th className="p-3">Ubicación</th>
-              <th className="p-3">Acciones</th>
+              <th className="text-left p-3">Código</th>
+              <th className="text-left p-3">Nombre</th>
+              <th className="text-left p-3">Serie</th>
+              <th className="text-left p-3">Marca</th>
+              <th className="text-left p-3">Modelo</th>
+              <th className="text-left p-3">Estado</th>
+              <th className="text-left p-3">Ubicación</th>
+              <th className="text-right p-3">Acciones</th>
             </tr>
           </thead>
-          <tbody className="[&_tr]:border-t [&_tr]:border-zinc-200">
-            {machines && machines.length > 0 ? (
-              machines.map((m: Machine) => (
-                <tr key={m.id} className="hover:bg-zinc-50">
-                  <td className="p-3">{m.name ?? "—"}</td>
-                  <td className="p-3">{m.serial ?? "—"}</td>
-                  <td className="p-3">{m.brand ?? "—"}</td>
-                  <td className="p-3">{m.model ?? "—"}</td>
-                  <td className="p-3">{m.status ?? "—"}</td>
-                  <td className="p-3">{m.location ?? "—"}</td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/machines/${m.id}`}
-                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs text-white hover:bg-indigo-700"
+          <tbody className="[&_tr]:border-t [&_tr]:border-white/10">
+            {machines.map((m) => (
+              <tr key={m.id} className="hover:bg-white/5">
+                <td className="p-3 font-medium">{m.code}</td>
+                <td className="p-3">{m.name ?? "—"}</td>
+                <td className="p-3">{m.serial ?? "—"}</td>
+                <td className="p-3">{m.brand ?? "—"}</td>
+                <td className="p-3">{m.model ?? "—"}</td>
+                <td className="p-3">{m.status ?? "—"}</td>
+                <td className="p-3">{m.location ?? "—"}</td>
+                <td className="p-3">
+                  <div className="flex gap-2 justify-end">
+                    <Link
+                      href={`/machines/${m.id}`}
+                      className="px-2 py-1 rounded-md border border-white/15 hover:bg-white/10"
+                    >
+                      Ver / Editar
+                    </Link>
+
+                    <form action={deleteMachine}>
+                      <input type="hidden" name="id" value={m.id} />
+                      <button
+                        type="submit"
+                        className="px-2 py-1 rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10"
                       >
-                        Ver
-                      </Link>
-                      <form action={deleteMachine}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md bg-rose-600 px-3 py-1.5 text-xs text-white hover:bg-rose-700"
-                        >
-                          Eliminar
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
+                        Eliminar
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {machines.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-zinc-500">
-                  No hay máquinas registradas.
+                <td colSpan={8} className="p-4 text-center text-white/60">
+                  Sin máquinas aún.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
