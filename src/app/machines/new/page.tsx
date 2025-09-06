@@ -1,4 +1,3 @@
-// src/app/machines/new/page.tsx
 import Link from "next/link";
 import { createMachine } from "../actions";
 
