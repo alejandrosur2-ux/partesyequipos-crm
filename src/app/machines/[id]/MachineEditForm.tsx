@@ -1,147 +1,141 @@
+// src/app/machines/[id]/MachineEditForm.tsx
 "use client";
 
-// src/app/machines/[id]/MachineEditForm.tsx
-import { useFormState, useFormStatus } from "react-dom";
-import { updateMachine, deleteMachine } from "../actions";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Machine = {
+type Props = {
   id: string;
-  code: string;
-  name: string | null;
-  serial: string | null;
-  brand: string | null;
-  model: string | null;
-  status: string | null;
-  location: string | null;
+  initial: {
+    name: string;
+    brand: string;
+    model: string;
+    serial: string;
+    status_enum: "disponible" | "rentada" | "en_reparacion";
+  };
 };
 
-function SaveButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
-      disabled={pending}
-    >
-      {pending ? "Guardando..." : "Guardar cambios"}
-    </button>
-  );
-}
-
-export default function MachineEditForm({ machine }: { machine: Machine }) {
+export default function MachineEditForm({ id, initial }: Props) {
   const router = useRouter();
-  const [state, formAction] = useFormState(updateMachine as any, null);
+  const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/machines/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name?.trim() || null,
+          brand: form.brand?.trim() || null,
+          model: form.model?.trim() || null,
+          serial: form.serial?.trim() || null,
+          status: form.status_enum, // 👈 viene del select
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "No se pudo guardar");
+      }
+
+      // Vuelve al listado
+      router.push("/machines");
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {state && "ok" in state && !state.ok && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">
-          {state.message}
-        </div>
-      )}
-
-      <form action={formAction} className="space-y-4 bg-white/5 p-5 rounded-lg border border-white/10">
-        <input type="hidden" name="id" value={machine.id} />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="block">
-            <span className="text-sm text-white/80">Código *</span>
-            <input
-              name="code"
-              defaultValue={machine.code}
-              required
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-white/80">Nombre *</span>
-            <input
-              name="name"
-              defaultValue={machine.name ?? ""}
-              required
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-white/80">Serie</span>
-            <input
-              name="serial"
-              defaultValue={machine.serial ?? ""}
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-white/80">Marca</span>
-            <input
-              name="brand"
-              defaultValue={machine.brand ?? ""}
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-white/80">Modelo</span>
-            <input
-              name="model"
-              defaultValue={machine.model ?? ""}
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-sm text-white/80">Estado</span>
-            <input
-              name="status"
-              defaultValue={machine.status ?? ""}
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
-
-          <label className="block md:col-span-2">
-            <span className="text-sm text-white/80">Ubicación</span>
-            <input
-              name="location"
-              defaultValue={machine.location ?? ""}
-              className="mt-1 w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-white"
-            />
-          </label>
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium">Nombre</label>
+          <input
+            className="w-full border p-2 rounded"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Ej. Retro 25"
+          />
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
-          <SaveButton />
+        <div>
+          <label className="block text-sm font-medium">Marca</label>
+          <input
+            className="w-full border p-2 rounded"
+            value={form.brand}
+            onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
+            placeholder="Ej. XCMG"
+          />
+        </div>
 
-          {/* eliminar desde la ficha */}
-          <form
-            action={async (fd) => {
-              // encadenamos a la server action delete
-              await deleteMachine(fd);
-            }}
+        <div>
+          <label className="block text-sm font-medium">Modelo</label>
+          <input
+            className="w-full border p-2 rounded"
+            value={form.model}
+            onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+            placeholder="Ej. XS123"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Serie</label>
+          <input
+            className="w-full border p-2 rounded"
+            value={form.serial}
+            onChange={(e) => setForm((f) => ({ ...f, serial: e.target.value }))}
+            placeholder="Ej. 000123"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Estado</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={form.status_enum}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                status_enum: e.target.value as Props["initial"]["status_enum"],
+              }))
+            }
           >
-            <input type="hidden" name="id" value={machine.id} />
-            <button
-              type="submit"
-              className="px-3 py-2 rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10"
-              onClick={(e) => {
-                if (!confirm("¿Eliminar esta máquina?")) e.preventDefault();
-              }}
-            >
-              Eliminar
-            </button>
-          </form>
-
-          <button
-            type="button"
-            className="px-3 py-2 rounded-md border border-white/15 hover:bg-white/10"
-            onClick={() => router.push("/machines")}
-          >
-            Volver
-          </button>
+            <option value="disponible">Disponible</option>
+            <option value="rentada">Rentada</option>
+            <option value="en_reparacion">En reparación</option>
+          </select>
         </div>
-      </form>
-    </div>
+      </div>
+
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-60"
+        >
+          {saving ? "Guardando..." : "Guardar cambios"}
+        </button>
+
+        <button
+          type="button"
+          className="px-4 py-2 rounded border"
+          onClick={() => router.push("/machines")}
+          disabled={saving}
+        >
+          Cancelar
+        </button>
+      </div>
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+    </form>
   );
 }
