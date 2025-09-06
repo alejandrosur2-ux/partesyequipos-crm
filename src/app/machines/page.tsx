@@ -1,32 +1,26 @@
 // src/app/machines/page.tsx
-import Link from 'next/link';
-import { supabaseServer } from '@/lib/supabase/server';
-import { deleteMachine } from './actions';
+import Link from "next/link";
+import { supabaseServer } from "@/lib/supabase/server";
+import { deleteMachine } from "./actions";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type Machine = {
-  id: string;
-  name: string | null;
-  serial: string | null;
-  brand: string | null;
-  model: string | null;
-  status: string | null;
-  location: string | null;
-  created_at: string | null;
-};
+// util para tomar el primer campo disponible
+function pick(obj: Record<string, any>, keys: string[], fallback: string = "—") {
+  for (const k of keys) {
+    if (obj && obj[k] != null && obj[k] !== "") return String(obj[k]);
+  }
+  return fallback;
+}
 
 export default async function MachinesPage() {
   const sb = supabaseServer();
 
-  const { data, error } = await sb
-    .from('machines')
-    .select('id,name,serial,brand,model,status,location,created_at')
-    .order('created_at', { ascending: false });
+  // Pedimos todas las columnas para evitar errores por nombres distintos
+  const { data, error } = await sb.from("machines").select("*").order("created_at", { ascending: false });
 
   if (error) {
-    // Evita romper el render si hay error de Supabase
     return (
       <main className="p-6">
         <h1 className="text-2xl font-bold mb-4">Máquinas</h1>
@@ -35,7 +29,7 @@ export default async function MachinesPage() {
     );
   }
 
-  const machines: Machine[] = data ?? [];
+  const machines: Record<string, any>[] = data ?? [];
 
   return (
     <main className="p-6">
@@ -80,42 +74,60 @@ export default async function MachinesPage() {
               </tr>
             )}
 
-            {machines.map((m) => (
-              <tr key={m.id} className="hover:bg-zinc-50">
-                <td className="p-3 text-zinc-900">{m.name ?? '—'}</td>
-                <td className="p-3 text-zinc-900">{m.serial ?? '—'}</td>
-                <td className="p-3 text-zinc-900">{m.brand ?? '—'}</td>
-                <td className="p-3 text-zinc-900">{m.model ?? '—'}</td>
-                <td className="p-3">
-                  <span className="inline-block rounded-full px-2 py-0.5 text-xs border border-zinc-300 text-zinc-700 bg-white">
-                    {m.status ?? '—'}
-                  </span>
-                </td>
-                <td className="p-3 text-zinc-900">{m.location ?? '—'}</td>
-                <td className="p-3 text-zinc-900">
-                  {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
-                </td>
-                <td className="p-3">
-                  <div className="flex justify-end gap-2">
-                    <Link
-                      href={`/machines/${m.id}`}
-                      className="px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                    >
-                      Ver
-                    </Link>
-                    <form action={deleteMachine}>
-                      <input type="hidden" name="id" value={m.id} />
-                      <button
-                        type="submit"
-                        className="px-2.5 py-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs"
-                      >
-                        Eliminar
-                      </button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {machines.map((m) => {
+              const id = pick(m, ["id"], "");
+              const name = pick(m, ["name", "nombre"]);
+              const serial = pick(m, ["serial", "serie"]);
+              const brand = pick(m, ["brand", "marca"]);
+              const model = pick(m, ["model", "modelo"]);
+              const status = pick(m, ["status", "estado"]);
+              const location = pick(m, ["location", "ubicacion", "ubicación"]);
+              const created = pick(m, ["created_at", "createdAt", "fecha_creacion"]);
+
+              const createdStr =
+                created !== "—" && !Number.isNaN(Date.parse(created))
+                  ? new Date(created).toLocaleDateString()
+                  : "—";
+
+              return (
+                <tr key={id || Math.random()} className="hover:bg-zinc-50">
+                  <td className="p-3 text-zinc-900">{name}</td>
+                  <td className="p-3 text-zinc-900">{serial}</td>
+                  <td className="p-3 text-zinc-900">{brand}</td>
+                  <td className="p-3 text-zinc-900">{model}</td>
+                  <td className="p-3">
+                    <span className="inline-block rounded-full px-2 py-0.5 text-xs border border-zinc-300 text-zinc-700 bg-white">
+                      {status}
+                    </span>
+                  </td>
+                  <td className="p-3 text-zinc-900">{location}</td>
+                  <td className="p-3 text-zinc-900">{createdStr}</td>
+                  <td className="p-3">
+                    <div className="flex justify-end gap-2">
+                      {id ? (
+                        <Link
+                          href={`/machines/${id}`}
+                          className="px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                        >
+                          Ver
+                        </Link>
+                      ) : null}
+                      {id ? (
+                        <form action={deleteMachine}>
+                          <input type="hidden" name="id" value={id} />
+                          <button
+                            type="submit"
+                            className="px-2.5 py-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs"
+                          >
+                            Eliminar
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
