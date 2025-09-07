@@ -1,40 +1,110 @@
-// src/app/machines/[id]/page.tsx
-import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabase/server";
-import MachineEditForm from "./MachineEditForm";
+"use client";
 
-type PageProps = { params: Promise<{ id: string }> };
-export const runtime = "nodejs";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default async function MachineDetailPage({ params }: PageProps) {
-  const { id } = await params;
-  const supabase = supabaseServer();
+type Machine = {
+  id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  status: "disponible" | "rentada" | "en_reparacion";
+};
 
-  const { data: machine, error } = await supabase
-    .from("machines")
-    .select("id, name, brand, model, serial, status_enum")
-    .eq("id", id)
-    .single();
+export default function EditMachinePage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const [machine, setMachine] = useState<Machine | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (error || !machine) redirect("/machines");
+  // Cargar la máquina
+  useEffect(() => {
+    async function fetchMachine() {
+      const res = await fetch(`/api/machines/${params.id}`);
+      if (res.ok) {
+        setMachine(await res.json());
+      }
+    }
+    fetchMachine();
+  }, [params.id]);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+
+    const res = await fetch(`/api/machines/${params.id}`, {
+      method: "PUT",
+      body: formData,
+    });
+
+    setLoading(false);
+
+    if (res.ok) {
+      router.push("/machines");
+    } else {
+      alert("Error al actualizar máquina");
+    }
+  }
+
+  if (!machine) return <p className="text-white">Cargando...</p>;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900">Editar máquina</h1>
+    <div className="max-w-lg mx-auto p-6 bg-white text-black rounded-md shadow">
+      <h1 className="text-2xl font-bold mb-4">Editar Máquina</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block mb-1 font-medium">Nombre</label>
+          <input
+            type="text"
+            name="name"
+            defaultValue={machine.name}
+            required
+            className="w-full border border-gray-300 rounded-md p-2 text-black"
+          />
+        </div>
 
-      {/* 👇 Forzamos texto oscuro dentro del card */}
-      <div className="bg-white text-gray-900 rounded-lg shadow p-6">
-        <MachineEditForm
-          id={machine.id}
-          initial={{
-            name: machine.name ?? "",
-            brand: machine.brand ?? "",
-            model: machine.model ?? "",
-            serial: machine.serial ?? "",
-            status_enum: (machine.status_enum as any) ?? "disponible",
-          }}
-        />
-      </div>
+        <div>
+          <label className="block mb-1 font-medium">Marca</label>
+          <input
+            type="text"
+            name="brand"
+            defaultValue={machine.brand ?? ""}
+            className="w-full border border-gray-300 rounded-md p-2 text-black"
+          />
+        </div>
+
+        <div>
+          <label className="block mb-1 font-medium">Modelo</label>
+          <input
+            type="text"
+            name="model"
+            defaultValue={machine.model ?? ""}
+            className="w-full border border-gray-300 rounded-md p-2 text-black"
+          />
+        </div>
+
+        <div>
+          <label className="block mb-1 font-medium">Estado</label>
+          <select
+            name="status"
+            defaultValue={machine.status}
+            className="w-full border border-gray-300 rounded-md p-2 text-black bg-white"
+          >
+            <option value="disponible">Disponible</option>
+            <option value="rentada">Rentada</option>
+            <option value="en_reparacion">En reparación</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-md"
+        >
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
     </div>
   );
 }
