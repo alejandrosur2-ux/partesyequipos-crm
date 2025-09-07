@@ -2,37 +2,38 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server-only";
 
-/** POST /api/machines  -> crea una máquina */
+function normalizeStatus(input: any) {
+  const raw = String(input ?? "").toLowerCase().trim();
+  // Acepta variantes y mapea al enum real
+  if (["en_reparacion", "en reparacion", "en-reparacion", "en reparación"].includes(raw)) {
+    return "en reparación";
+  }
+  if (["rentada", "alquilada"].includes(raw)) {
+    return "rentada";
+  }
+  // fallback
+  return "disponible";
+}
+
 export async function POST(req: Request) {
   try {
-    const { name, brand, model, serial, status } = await req.json();
+    const body = await req.json();
+    const name = String(body?.name ?? "").trim();
+    const brand = body?.brand ? String(body.brand).trim() : null;
+    const model = body?.model ? String(body.model).trim() : null;
+    const serial = body?.serial ? String(body.serial).trim() : null;
+    const status = normalizeStatus(body?.status);
 
-    // Validaciones básicas
-    const s = (status ?? "disponible") as "disponible" | "rentada" | "en_reparacion";
-    if (!["disponible", "rentada", "en_reparacion"].includes(s)) {
-      return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
-    }
-
-    if (!name || String(name).trim().length === 0) {
+    if (!name) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
 
-    // Generar código (la tabla antes daba error de NOT NULL en code)
     const code = `MAQ-${Date.now().toString().slice(-6)}`;
 
     const supabase = createClient();
     const { data, error } = await supabase
       .from("machines")
-      .insert([
-        {
-          code,                 // evita "null value in column code"
-          name: name?.trim(),
-          brand: brand?.trim() || null,
-          model: model?.trim() || null,
-          serial: serial?.trim() || null,
-          status: s,            // respeta el CHECK machines_status_chk
-        },
-      ])
+      .insert([{ code, name, brand, model, serial, status }])
       .select()
       .single();
 
