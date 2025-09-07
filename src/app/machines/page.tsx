@@ -1,121 +1,83 @@
-// Server Component (SSR) — Lista de máquinas sin fetch cliente
-import Link from "next/link";
+// Crear máquina (SSR, sin hooks)
 import { supabaseServer } from "@/lib/supabase/server";
+import Link from "next/link";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
-type Machine = {
-  id: string;
-  name: string | null;
-  code: string | null;
-  brand: string | null;
-  model: string | null;
-  serial: string | null;
-  location: string | null;
-  status: string | null;
-};
+// Ajusta estos valores a los que EXISTEN en tu enum machine_status
+const STATUS_OPTS = [
+  { value: "disponible", label: "Disponible" },
+  { value: "en-reparacion", label: "En reparación" }, // OJO: con guion si tu enum es así
+  { value: "rentada", label: "Rentada" },
+];
 
-export default async function MachinesPage() {
-  const supabase = supabaseServer();
-
-  let errorMsg: string | null = null;
-  let machines: Machine[] = [];
-
-  try {
-    const { data, error } = await supabase
-      .from("machines")
-      .select("id,name,code,brand,model,serial,location,status")
-      .order("created_at", { ascending: false });
-
-    if (error) errorMsg = error.message;
-    machines = data ?? [];
-  } catch (e: any) {
-    errorMsg = e?.message ?? "Error desconocido al obtener máquinas";
-  }
+export default async function NewMachinePage() {
+  // Solo para verificar conexión; no usamos datos aquí
+  await supabaseServer();
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Máquinas</h1>
+        <h1 className="text-2xl font-bold text-white">Nueva máquina</h1>
         <Link
-          href="/machines/new"
-          className="rounded-md bg-yellow-600 px-4 py-2 font-semibold text-white hover:bg-yellow-700"
+          href="/machines"
+          className="rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-800"
         >
-          Nueva máquina
+          Volver
         </Link>
       </div>
 
-      {errorMsg ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
-          <p className="font-semibold">Error al cargar máquinas</p>
-          <p className="text-sm opacity-80">{errorMsg}</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="min-w-full text-left text-sm text-black">
-            <thead className="border-b bg-gray-50 text-gray-700">
-              <tr>
-                <th className="p-3">Nombre</th>
-                <th className="p-3">Código</th>
-                <th className="p-3">Marca</th>
-                <th className="p-3">Modelo</th>
-                <th className="p-3">Serie</th>
-                <th className="p-3">Ubicación</th>
-                <th className="p-3">Estado</th>
-                <th className="p-3 w-44">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="[&_tr]:border-t [&_tr]:border-gray-200">
-              {machines.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="p-4 text-gray-500">
-                    No hay máquinas aún.
-                  </td>
-                </tr>
-              )}
+      <form action="/api/machines" method="post" className="space-y-4 rounded-lg bg-white p-6 shadow text-black">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-sm text-gray-700">Código *</span>
+            <input name="code" required className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
 
-              {machines.map((m) => (
-                <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="p-3">{m.name ?? "—"}</td>
-                  <td className="p-3">{m.code ?? "—"}</td>
-                  <td className="p-3">{m.brand ?? "—"}</td>
-                  <td className="p-3">{m.model ?? "—"}</td>
-                  <td className="p-3">{m.serial ?? "—"}</td>
-                  <td className="p-3">{m.location ?? "—"}</td>
-                  <td className="p-3 capitalize">
-                    {m.status?.replace("_", " ") ?? "—"}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/machines/${m.id}`}
-                        className="rounded-md bg-gray-900 px-3 py-1 text-white hover:bg-gray-800"
-                      >
-                        Ver / Editar
-                      </Link>
+          <label className="block">
+            <span className="text-sm text-gray-700">Nombre</span>
+            <input name="name" className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
 
-                      {/* Formulario para borrar SIN JS (method override) */}
-                      <form action={`/api/machines/${m.id}`} method="post">
-                        <input type="hidden" name="_method" value="DELETE" />
-                        <button
-                          className="rounded-md bg-red-600 px-3 py-1 text-white hover:bg-red-700"
-                          onClick={(e) => {
-                            if (!confirm("¿Eliminar máquina?")) e.preventDefault();
-                          }}
-                        >
-                          Eliminar
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
+          <label className="block">
+            <span className="text-sm text-gray-700">Marca</span>
+            <input name="brand" className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-gray-700">Modelo</span>
+            <input name="model" className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-gray-700">N° Serie</span>
+            <input name="serial" className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-gray-700">Ubicación</span>
+            <input name="location" className="mt-1 w-full rounded border px-3 py-2" />
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="text-sm text-gray-700">Estado *</span>
+            <select name="status" required className="mt-1 w-full rounded border px-3 py-2 bg-white">
+              {STATUS_OPTS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </label>
         </div>
-      )}
+
+        <div className="flex gap-2">
+          <button className="rounded-md bg-yellow-600 px-4 py-2 font-semibold text-white hover:bg-yellow-700">
+            Guardar
+          </button>
+          <a href="/machines" className="rounded-md border px-4 py-2">Cancelar</a>
+        </div>
+      </form>
     </div>
   );
 }
