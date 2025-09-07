@@ -1,48 +1,46 @@
-// src/app/api/machines/route.ts
+// Crear máquina
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server-only";
+import { supabaseServer } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 
-function normalizeStatus(input: any) {
-  const raw = String(input ?? "").toLowerCase().trim();
-  // Acepta variantes y mapea al enum real
-  if (["en_reparacion", "en reparacion", "en-reparacion", "en reparación"].includes(raw)) {
-    return "en reparación";
-  }
-  if (["rentada", "alquilada"].includes(raw)) {
-    return "rentada";
-  }
-  // fallback
-  return "disponible";
-}
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const name = String(body?.name ?? "").trim();
-    const brand = body?.brand ? String(body.brand).trim() : null;
-    const model = body?.model ? String(body.model).trim() : null;
-    const serial = body?.serial ? String(body.serial).trim() : null;
-    const status = normalizeStatus(body?.status);
+  const supabase = supabaseServer();
+  const form = await req.formData();
 
-    if (!name) {
-      return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
-    }
+  const code = (form.get("code") || "").toString().trim();
+  const name = (form.get("name") || "").toString().trim() || null;
+  const brand = (form.get("brand") || "").toString().trim() || null;
+  const model = (form.get("model") || "").toString().trim() || null;
+  const serial = (form.get("serial") || "").toString().trim() || null;
+  const location = (form.get("location") || "").toString().trim() || null;
+  const status = (form.get("status") || "disponible").toString().trim();
 
-    const code = `MAQ-${Date.now().toString().slice(-6)}`;
-
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("machines")
-      .insert([{ code, name, brand, model, serial, status }])
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ ok: true, machine: data }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Error inesperado" }, { status: 500 });
+  if (!code) {
+    return NextResponse.json({ ok: false, error: "El código es obligatorio" }, { status: 400 });
   }
+
+  // Asegúrate que 'status' sea un valor válido de tu enum
+  const allowed = ["disponible", "en-reparacion", "rentada"]; // Ajusta a tu enum real
+  if (!allowed.includes(status)) {
+    return NextResponse.json({ ok: false, error: `Estado inválido: ${status}` }, { status: 400 });
+  }
+
+  const { error } = await supabase.from("machines").insert({
+    code,
+    name,
+    brand,
+    model,
+    serial,
+    location,
+    status,
+  });
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  }
+
+  revalidatePath("/machines");
+  return NextResponse.redirect(new URL("/machines", process.env.NEXT_PUBLIC_SITE_URL ?? "https://"+(process.env.VERCEL_URL || "localhost:3000")));
 }
