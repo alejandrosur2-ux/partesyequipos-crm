@@ -2,84 +2,59 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
-// Ajusta a los valores que tu DB acepta hoy
-const ALLOWED_STATUS = ["disponible", "rentada", "en_reparacion", "activo"] as const;
-type Status = (typeof ALLOWED_STATUS)[number];
-
-function pickStatus(v: FormDataEntryValue | null): Status | null {
-  const s = (v ?? "").toString();
-  return (ALLOWED_STATUS as readonly string[]).includes(s) ? (s as Status) : null;
-}
-
-function num(v: FormDataEntryValue | null) {
-  const n = v?.toString().trim();
-  return n ? Number(n) : null;
-}
-
-export async function createMachine(formData: FormData) {
-  const supabase = supabaseServer();
-
-  const payload = {
-    name: (formData.get("name") as string) || null,
-    code: (formData.get("code") as string) || null,
-    brand: (formData.get("brand") as string) || null,
-    model: (formData.get("model") as string) || null,
-    serial: (formData.get("serial") as string) || null,
-    status: pickStatus(formData.get("status")),
-    type: (formData.get("type") as string) || null,
-    location: (formData.get("location") as string) || null,
-    base_rate_hour: num(formData.get("base_rate_hour")),
-    base_rate_day: num(formData.get("base_rate_day")),
-    fuel_consumption: num(formData.get("fuel_consumption")),
-  };
-
-  const { error } = await supabase.from("machines").insert(payload).select("id").maybeSingle();
-  if (error) {
-    console.error("createMachine error:", error);
-    throw new Error(error.message);
-  }
-  revalidatePath("/machines");
-}
-
 export async function updateMachine(formData: FormData) {
-  const id = formData.get("id")?.toString();
-  if (!id) throw new Error("id requerido");
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Falta id");
 
-  const supabase = supabaseServer();
   const payload = {
-    name: (formData.get("name") as string) || null,
-    code: (formData.get("code") as string) || null,
-    brand: (formData.get("brand") as string) || null,
-    model: (formData.get("model") as string) || null,
-    serial: (formData.get("serial") as string) || null,
-    status: pickStatus(formData.get("status")),
-    type: (formData.get("type") as string) || null,
-    location: (formData.get("location") as string) || null,
-    base_rate_hour: num(formData.get("base_rate_hour")),
-    base_rate_day: num(formData.get("base_rate_day")),
-    fuel_consumption: num(formData.get("fuel_consumption")),
+    name: toStr(formData.get("name")),
+    code: toStr(formData.get("code")),
+    brand: toStr(formData.get("brand")),
+    model: toStr(formData.get("model")),
+    serial: toStr(formData.get("serial")),
+    type: toStr(formData.get("type")),
+    location: toStr(formData.get("location")),
+    status: toStr(formData.get("status")), // usar exactamente los valores válidos en tu BD
+    base_rate_hour: toNum(formData.get("base_rate_hour")),
+    base_rate_day: toNum(formData.get("base_rate_day")),
+    fuel_consumption: toNum(formData.get("fuel_consumption")),
+    updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase.from("machines").update(payload).eq("id", id);
+  // elimina campos undefined para no pisar con null
+  Object.keys(payload).forEach((k) => {
+    // @ts-ignore
+    if (payload[k] === undefined) delete payload[k];
+  });
+
+  const supabase = supabaseServer();
+  const { error } = await supabase
+    .from("machines")
+    .update(payload)
+    .eq("id", id)
+    .select("id")
+    .single();
+
   if (error) {
     console.error("updateMachine error:", error);
     throw new Error(error.message);
   }
-  revalidatePath("/machines");
+
   revalidatePath(`/machines/${id}`);
+  revalidatePath(`/machines`);
+  redirect(`/machines/${id}`);
 }
 
-export async function deleteMachine(formData: FormData) {
-  const id = formData.get("id")?.toString();
-  if (!id) throw new Error("id requerido");
-
-  const supabase = supabaseServer();
-  const { error } = await supabase.from("machines").delete().eq("id", id);
-  if (error) {
-    console.error("deleteMachine error:", error);
-    throw new Error(error.message);
-  }
-  revalidatePath("/machines");
+function toStr(v: FormDataEntryValue | null) {
+  const s = v?.toString().trim();
+  return s ? s : null;
+}
+function toNum(v: FormDataEntryValue | null) {
+  const s = v?.toString().trim();
+  if (!s) return null;
+  const n = Number(s.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
 }
