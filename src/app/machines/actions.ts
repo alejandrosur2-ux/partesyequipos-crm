@@ -2,59 +2,80 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
+export async function getMachine(id: string) {
+  const supabase = supabaseServer();
+
+  const { data, error } = await supabase
+    .from("machines")
+    .select(
+      `
+      id, code, name, brand, model, serial, status,
+      base_rate_hour, base_rate_day, fuel_consumption,
+      created_at, updated_at
+    `
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getMachine error:", error);
+    throw new Error("No se pudo obtener la máquina");
+  }
+  if (!data) {
+    throw new Error("Máquina no encontrada");
+  }
+  return data;
+}
+
 export async function updateMachine(formData: FormData) {
+  const supabase = supabaseServer();
+
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Falta id");
 
-  const payload = {
-    name: toStr(formData.get("name")),
-    code: toStr(formData.get("code")),
-    brand: toStr(formData.get("brand")),
-    model: toStr(formData.get("model")),
-    serial: toStr(formData.get("serial")),
-    type: toStr(formData.get("type")),
-    location: toStr(formData.get("location")),
-    status: toStr(formData.get("status")), // usar exactamente los valores válidos en tu BD
-    base_rate_hour: toNum(formData.get("base_rate_hour")),
-    base_rate_day: toNum(formData.get("base_rate_day")),
-    fuel_consumption: toNum(formData.get("fuel_consumption")),
-    updated_at: new Date().toISOString(),
+  const payload: Record<string, any> = {
+    code: (formData.get("code") ?? "") || null,
+    name: (formData.get("name") ?? "") || null,
+    brand: (formData.get("brand") ?? "") || null,
+    model: (formData.get("model") ?? "") || null,
+    serial: (formData.get("serial") ?? "") || null,
   };
 
-  // elimina campos undefined para no pisar con null
-  Object.keys(payload).forEach((k) => {
-    // @ts-ignore
-    if (payload[k] === undefined) delete payload[k];
-  });
+  // Estado: dejamos solo la columna de texto "status" para evitar choques con enums
+  const statusInput = (formData.get("status") ?? "") as string;
+  if (statusInput) payload.status = statusInput;
 
-  const supabase = supabaseServer();
-  const { error } = await supabase
-    .from("machines")
-    .update(payload)
-    .eq("id", id)
-    .select("id")
-    .single();
+  // Campos numéricos opcionales
+  const baseRateHour = (formData.get("base_rate_hour") ?? "") as string;
+  const baseRateDay = (formData.get("base_rate_day") ?? "") as string;
+  const fuelConsumption = (formData.get("fuel_consumption") ?? "") as string;
 
-  if (error) {
+  if (baseRateHour !== "") payload.base_rate_hour = Number(baseRateHour);
+  if (baseRateDay !== "") payload.base_rate_day = Number(baseRateDay);
+  if (fuelConsumption !== "") payload.fuel_consumption = Number(fuelConsumption);
+
+  // Intento de update con status
+  let { error } = await supabase.from("machines").update(payload).eq("id", id);
+
+  // Si falla por tema enum u otra restricción de status, reintenta sin tocar status
+  if (error && /enum|check constraint|invalid input value/i.test(error.message)) {
+    console.warn("updateMachine reintento sin status por error:", error.message);
+    delete payload.status;
+    const retry = await supabase.from("machines").update(payload).eq("id", id);
+    if (retry.error) {
+      console.error("updateMachine error (retry):", retry.error);
+      throw new Error("No se pudo actualizar la máquina");
+    }
+  } else if (error) {
     console.error("updateMachine error:", error);
-    throw new Error(error.message);
+    throw new Error("No se pudo actualizar la máquina");
   }
 
+  // Revalidar lista y detalle
+  revalidatePath("/machines");
   revalidatePath(`/machines/${id}`);
-  revalidatePath(`/machines`);
-  redirect(`/machines/${id}`);
-}
 
-function toStr(v: FormDataEntryValue | null) {
-  const s = v?.toString().trim();
-  return s ? s : null;
-}
-function toNum(v: FormDataEntryValue | null) {
-  const s = v?.toString().trim();
-  if (!s) return null;
-  const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
+  return { ok: true, id };
 }
