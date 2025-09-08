@@ -3,25 +3,40 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 
 type Props = { params: { id: string } };
+export const revalidate = 0;
 
 export default async function MachineShowPage({ params }: Props) {
   const supabase = supabaseServer();
   const { data: m, error } = await supabase
     .from("machines")
-    .select("id, code, name, brand, model, serial, status, type, base_rate_hour, base_rate_day, fuel_consumption, location")
+    .select("id, code, name, brand, model, serial, status, type, base_rate_hour, base_rate_day, fuel_consumption, location, created_at, updated_at")
     .eq("id", params.id)
     .maybeSingle();
 
-  if (error) throw error;
-
-  if (!m) {
+  if (error) {
     return (
-      <div className="p-6">
-        <p>No existe la máquina.</p>
-        <Link className="underline" href="/machines">Volver</Link>
+      <div className="p-6 space-y-3">
+        <h1 className="text-xl font-bold">Error al cargar la máquina</h1>
+        <pre className="text-sm opacity-80">{String(error.message)}</pre>
+        <Link href="/machines" className="underline">Volver</Link>
       </div>
     );
   }
+  if (!m) {
+    return (
+      <div className="p-6 space-y-3">
+        <p>No existe la máquina.</p>
+        <Link href="/machines" className="underline">Volver</Link>
+      </div>
+    );
+  }
+
+  const Item = ({ k, v }: { k: string; v?: string | number | null }) => (
+    <div className="rounded border p-3">
+      <div className="text-xs opacity-70">{k}</div>
+      <div className="font-medium">{v ?? "—"}</div>
+    </div>
+  );
 
   return (
     <div className="p-6 space-y-4">
@@ -43,19 +58,10 @@ export default async function MachineShowPage({ params }: Props) {
         <Item k="Estado" v={m.status} />
         <Item k="Tipo" v={m.type} />
         <Item k="Ubicación" v={m.location} />
-        <Item k="Tarifa hora" v={m.base_rate_hour?.toString()} />
-        <Item k="Tarifa día" v={m.base_rate_day?.toString()} />
-        <Item k="Consumo (L/h)" v={m.fuel_consumption?.toString()} />
+        <Item k="Tarifa hora" v={m.base_rate_hour as any} />
+        <Item k="Tarifa día" v={m.base_rate_day as any} />
+        <Item k="Consumo (L/h)" v={m.fuel_consumption as any} />
       </div>
-    </div>
-  );
-}
-
-function Item({ k, v }: { k: string; v?: string | null }) {
-  return (
-    <div className="rounded border p-3">
-      <div className="text-xs opacity-80">{k}</div>
-      <div className="font-medium">{v ?? "—"}</div>
     </div>
   );
 }
