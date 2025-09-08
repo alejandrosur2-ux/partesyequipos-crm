@@ -1,86 +1,66 @@
 // src/app/machines/[id]/page.tsx
-import { createClient } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server"; // tu helper
 import Link from "next/link";
 
-export default async function Page({
-  params,
-}: {
-  // 👇 En Next 15 a veces viene como Promise
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params; // 👈 Importante
+type Props = { params: { id: string } };
 
-  const supabase = createClient();
-  const { data: machine, error } = await supabase
+export default async function MachineDetailPage({ params }: Props) {
+  const supabase = supabaseServer();
+
+  // lee SOLO de public.machines y SOLO columnas existentes
+  const { data: m, error } = await supabase
     .from("machines")
     .select(
-      // usa solo columnas reales; ajusta si usas la vista v_machines_es
-      "id,name,serial,status,daily_rate,brand,model,notes,created_at,updated_at"
+      "id, code, name, type, brand, model, serial, status, base_rate_hour, base_rate_day, fuel_consumption, location, created_at, updated_at"
     )
-    .eq("id", id)
-    .single();
+    .eq("id", params.id)
+    .maybeSingle();
 
   if (error) {
-    // Evita crashear el render del Server Component
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Máquinas</h1>
-        <p className="mt-4 text-red-400">
-          Error al cargar la máquina: {error.message}
-        </p>
-        <Link href="/machines" className="mt-6 inline-block underline">
-          ← Volver
-        </Link>
-      </div>
-    );
+    // ayuda a debuggear
+    console.error("machines/[id] select error:", error);
+    throw new Error("No se pudo cargar la máquina");
   }
-
-  if (!machine) {
+  if (!m) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-semibold">Máquinas</h1>
-        <p className="mt-4">No se encontró la máquina solicitada.</p>
-        <Link href="/machines" className="mt-6 inline-block underline">
-          ← Volver
-        </Link>
+        <p>No encontrada.</p>
+        <Link href="/machines" className="underline">Volver</Link>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{machine.name}</h1>
-        <Link
-          href={`/machines/${machine.id}/edit`}
-          className="rounded px-3 py-1.5 bg-white/10 hover:bg-white/20"
-        >
-          Editar
-        </Link>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-white/10 p-4">
-          <h2 className="mb-3 text-sm uppercase tracking-wide text-white/60">
-            Información
-          </h2>
-          <div className="space-y-2 text-white/90">
-            <div><span className="text-white/60">Serie:</span> {machine.serial ?? "—"}</div>
-            <div><span className="text-white/60">Estado:</span> {machine.status}</div>
-            <div><span className="text-white/60">Tarifa diaria:</span> {Number(machine.daily_rate ?? 0).toLocaleString()}</div>
-            <div><span className="text-white/60">Marca:</span> {machine.brand ?? "—"}</div>
-            <div><span className="text-white/60">Modelo:</span> {machine.model ?? "—"}</div>
-            <div><span className="text-white/60">Creada:</span> {new Date(machine.created_at).toLocaleString()}</div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-white/10 p-4">
-          <h2 className="mb-3 text-sm uppercase tracking-wide text-white/60">
-            Observaciones
-          </h2>
-          <p className="text-white/90">{machine.notes ?? "Sin observaciones."}</p>
+        <h1 className="text-2xl font-semibold">{m.name ?? m.code}</h1>
+        <div className="flex gap-2">
+          <Link href={`/machines/${m.id}/edit`} className="btn btn-primary">Editar</Link>
+          <Link href="/machines" className="btn">Volver</Link>
         </div>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Info label="Código" value={m.code} />
+        <Info label="Tipo" value={m.type} />
+        <Info label="Marca" value={m.brand} />
+        <Info label="Modelo" value={m.model} />
+        <Info label="Serie" value={m.serial} />
+        <Info label="Estado" value={m.status} />
+        <Info label="Tarifa hora" value={m.base_rate_hour?.toString()} />
+        <Info label="Tarifa día" value={m.base_rate_day?.toString()} />
+        <Info label="Consumo" value={m.fuel_consumption?.toString()} />
+        <Info label="Ubicación" value={m.location} />
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-xs opacity-70">{label}</div>
+      <div className="font-medium">{value ?? "—"}</div>
     </div>
   );
 }
