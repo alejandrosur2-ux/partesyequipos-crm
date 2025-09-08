@@ -1,113 +1,68 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
-// helper para sanear strings
-const S = (v: FormDataEntryValue | null): string | null => {
-  if (!v) return null;
-  const s = String(v).trim();
-  return s.length ? s : null;
-};
+type ActionState = { ok: boolean; message: string };
 
-/** CREATE (ya lo tenías funcionando, lo dejo incluido para consistencia) */
-export async function createMachine(
-  _prev: any,
-  formData: FormData
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+export async function createMachine(prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const sb = supabaseServer();
+    const supabase = supabaseServer();
+    const payload = readPayload(formData);
 
-    let code = S(formData.get("code"));
-    const name = S(formData.get("name"));
-    const serial = S(formData.get("serial"));
-    const brand = S(formData.get("brand"));
-    const model = S(formData.get("model"));
-    const status = S(formData.get("status"));
-    const location = S(formData.get("location"));
-
-    if (!name) return { ok: false, message: "El nombre es obligatorio." };
-    if (!code) code = `M-${Date.now().toString(36).toUpperCase()}`;
-
-    const { data, error } = await sb
-      .from("machines")
-      .insert({ code, name, serial, brand, model, status, location })
-      .select("id")
-      .single();
-
-    if (error) {
-      if (error.message?.toLowerCase().includes("duplicate")) {
-        return { ok: false, message: "El código ya existe. Usa otro." };
-      }
-      return { ok: false, message: error.message };
+    if (!["disponible", "rentada", "en_reparacion"].includes(payload.status ?? "")) {
+      payload.status = "disponible";
     }
 
+    const { error } = await supabase.from("machines").insert(payload);
+    if (error) throw error;
+
     revalidatePath("/machines");
-    revalidatePath("/dashboard");
-    return { ok: true, id: data.id as string };
+    return { ok: true, message: "Creada" };
   } catch (e: any) {
-    return { ok: false, message: e?.message || "Error al crear." };
+    console.error("createMachine error:", e);
+    return { ok: false, message: e.message ?? "Error al crear" };
   }
 }
 
-/** UPDATE */
-export async function updateMachine(
-  _prev: any,
-  formData: FormData
-): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function updateMachine(prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const sb = supabaseServer();
+    const supabase = supabaseServer();
+    const id = formData.get("id") as string;
+    if (!id) throw new Error("ID requerido");
 
-    const id = S(formData.get("id"));
-    if (!id) return { ok: false, message: "Falta el id." };
-
-    const code = S(formData.get("code"));
-    const name = S(formData.get("name"));
-    const serial = S(formData.get("serial"));
-    const brand = S(formData.get("brand"));
-    const model = S(formData.get("model"));
-    const status = S(formData.get("status"));
-    const location = S(formData.get("location"));
-
-    // construimos objeto solo con campos presentes
-    const payload: Record<string, string | null> = {};
-    if (code !== null) payload.code = code;
-    if (name !== null) payload.name = name;
-    if (serial !== null) payload.serial = serial;
-    if (brand !== null) payload.brand = brand;
-    if (model !== null) payload.model = model;
-    if (status !== null) payload.status = status;
-    if (location !== null) payload.location = location;
-
-    const { error } = await sb.from("machines").update(payload).eq("id", id);
-
-    if (error) {
-      if (error.message?.toLowerCase().includes("duplicate")) {
-        return { ok: false, message: "El código ya existe para otra máquina." };
-      }
-      return { ok: false, message: error.message };
+    const payload = readPayload(formData);
+    if (!["disponible", "rentada", "en_reparacion"].includes(payload.status ?? "")) {
+      delete payload.status;
     }
 
+    const { error } = await supabase.from("machines").update(payload).eq("id", id);
+    if (error) throw error;
+
+    revalidatePath("/machines");
     revalidatePath(`/machines/${id}`);
-    revalidatePath("/machines");
-    revalidatePath("/dashboard");
-    return { ok: true };
+    return { ok: true, message: "Actualizada" };
   } catch (e: any) {
-    return { ok: false, message: e?.message || "Error al actualizar." };
+    console.error("updateMachine error:", e);
+    return { ok: false, message: e.message ?? "Error al actualizar" };
   }
 }
 
-/** DELETE */
-export async function deleteMachine(formData: FormData) {
-  const id = S(formData.get("id"));
-  if (!id) return;
+function readPayload(fd: FormData) {
+  const num = (v: FormDataEntryValue | null) =>
+    v === null || v === "" ? null : Number(v);
 
-  const sb = supabaseServer();
-  await sb.from("machines").delete().eq("id", id);
-
-  revalidatePath("/machines");
-  revalidatePath("/dashboard");
-  // si se elimina desde la ficha, lo mandamos a la lista
-  redirect("/machines");
+  return {
+    code: (fd.get("code") as string) || null,
+    name: (fd.get("name") as string) || null,
+    brand: (fd.get("brand") as string) || null,
+    model: (fd.get("model") as string) || null,
+    serial: (fd.get("serial") as string) || null,
+    type: (fd.get("type") as string) || null,
+    status: (fd.get("status") as string) || null,
+    base_rate_hour: num(fd.get("base_rate_hour")),
+    base_rate_day: num(fd.get("base_rate_day")),
+    fuel_consumption: num(fd.get("fuel_consumption")),
+    location: (fd.get("location") as string) || null,
+  };
 }
