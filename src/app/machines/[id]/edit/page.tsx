@@ -6,11 +6,12 @@ type Props = { params: { id: string } };
 
 export default async function EditMachinePage({ params }: Props) {
   const supabase = supabaseServer();
-  const { data: m } = await supabase
+  const { data: m, error } = await supabase
     .from("machines")
     .select("id, code, name, brand, model, serial, status, type, base_rate_hour, base_rate_day, fuel_consumption, location")
     .eq("id", params.id)
     .maybeSingle();
+  if (error) throw error;
 
   return <MachineForm mode="edit" initialData={m ?? undefined} />;
 }
