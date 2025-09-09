@@ -1,149 +1,116 @@
-// src/app/machines/[id]/MachineEditForm.tsx
 "use client";
 
+import { useFormStatus } from "react-dom";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { updateMachine } from "../../actions"; // <- correcto desde [id]/edit
 
-type Props = {
+type Machine = {
   id: string;
-  initial: {
-    name: string;
-    brand: string;
-    model: string;
-    serial: string;
-    status_enum: "disponible" | "rentada" | "en_reparacion";
-  };
+  code: string | null;
+  name: string | null;
+  brand: string | null;
+  model: string | null;
+  serial: string | null;
+  status: string | null; // opcional si mantienes la columna de texto
+  status_enum?: "disponible" | "rentada" | "en_reparacion" | null;
 };
 
-export default function MachineEditForm({ id, initial }: Props) {
-  const router = useRouter();
-  const [form, setForm] = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const STATUS_OPTIONS: Array<{ value: NonNullable<Machine["status_enum"]>; label: string }> = [
+  { value: "disponible",   label: "Disponible" },
+  { value: "rentada",       label: "Rentada" },
+  { value: "en_reparacion", label: "En reparación" },
+];
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
+function SubmitBtn() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="px-4 py-2 rounded-md bg-black text-white disabled:opacity-50 dark:bg-white dark:text-black"
+    >
+      {pending ? "Guardando..." : "Guardar cambios"}
+    </button>
+  );
+}
 
-    try {
-      const res = await fetch(`/api/machines/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name?.trim() || null,
-          brand: form.brand?.trim() || null,
-          model: form.model?.trim() || null,
-          serial: form.serial?.trim() || null,
-          status: form.status_enum,
-        }),
-      });
+export default function EditMachineForm({ machine }: { machine: Machine }) {
+  const initialEnum =
+    (machine.status_enum as Machine["status_enum"]) ??
+    (["disponible", "rentada", "en_reparacion"].includes(String(machine.status ?? "")) 
+      ? (machine.status as Machine["status_enum"])
+      : "disponible");
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "No se pudo guardar");
-      }
-
-      router.push("/machines");
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const labelCls = "block text-sm font-medium text-gray-700";
-  const inputCls =
-    "w-full border border-gray-300 p-2 rounded text-gray-900 placeholder-gray-500 bg-white";
-  const selectCls =
-    "w-full border border-gray-300 p-2 rounded text-gray-900 bg-white";
+  const [statusEnum, setStatusEnum] = useState<Machine["status_enum"]>(initialEnum);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Nombre</label>
-          <input
-            className={inputCls}
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Ej. Retro 25"
-          />
-        </div>
+    <form action={updateMachine} className="space-y-4 max-w-xl">
+      <input type="hidden" name="id" defaultValue={machine.id} />
 
-        <div>
-          <label className={labelCls}>Marca</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="block text-sm opacity-80">Nombre</span>
           <input
-            className={inputCls}
-            value={form.brand}
-            onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
-            placeholder="Ej. XCMG"
+            name="name"
+            defaultValue={machine.name ?? ""}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
           />
-        </div>
+        </label>
 
-        <div>
-          <label className={labelCls}>Modelo</label>
+        <label className="block">
+          <span className="block text-sm opacity-80">Código</span>
           <input
-            className={inputCls}
-            value={form.model}
-            onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-            placeholder="Ej. XS123"
+            name="code"
+            defaultValue={machine.code ?? ""}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
           />
-        </div>
+        </label>
 
-        <div>
-          <label className={labelCls}>Serie</label>
+        <label className="block">
+          <span className="block text-sm opacity-80">Marca</span>
           <input
-            className={inputCls}
-            value={form.serial}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, serial: e.target.value }))
-            }
-            placeholder="Ej. 000123"
+            name="brand"
+            defaultValue={machine.brand ?? ""}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
           />
-        </div>
+        </label>
 
-        <div>
-          <label className={labelCls}>Estado</label>
+        <label className="block">
+          <span className="block text-sm opacity-80">Modelo</span>
+          <input
+            name="model"
+            defaultValue={machine.model ?? ""}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
+          />
+        </label>
+
+        <label className="block sm:col-span-2">
+          <span className="block text-sm opacity-80">Serie</span>
+          <input
+            name="serial"
+            defaultValue={machine.serial ?? ""}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
+          />
+        </label>
+
+        <label className="block sm:col-span-2">
+          <span className="block text-sm opacity-80">Estado</span>
           <select
-            className={selectCls}
-            value={form.status_enum}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                status_enum: e.target
-                  .value as Props["initial"]["status_enum"],
-              }))
-            }
+            name="status_enum"
+            value={statusEnum ?? "disponible"}
+            onChange={(e) => setStatusEnum(e.target.value as Machine["status_enum"])}
+            className="mt-1 w-full rounded-md border px-3 py-2 bg-white text-black dark:bg-zinc-900 dark:text-white"
           >
-            <option value="disponible">Disponible</option>
-            <option value="rentada">Rentada</option>
-            <option value="en_reparacion">En reparación</option>
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
-        </div>
+        </label>
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-60"
-        >
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </button>
-
-        <button
-          type="button"
-          className="px-4 py-2 rounded border border-gray-300 text-gray-900 bg-white"
-          onClick={() => router.push("/machines")}
-          disabled={saving}
-        >
-          Cancelar
-        </button>
+      <div className="pt-2">
+        <SubmitBtn />
       </div>
-
-      {error && <p className="text-red-600 text-sm">{error}</p>}
     </form>
   );
 }
