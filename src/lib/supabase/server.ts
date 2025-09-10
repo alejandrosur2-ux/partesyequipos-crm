@@ -15,3 +15,12 @@ export function createSupabaseServerClient() {
     }
   )
 }
+
+/**
+ * Alias para compatibilidad con imports existentes:
+ *   import { supabaseServer } from '@/lib/supabase/server'
+ * Uso: const supabase = supabaseServer()
+ */
+export function supabaseServer() {
+  return createSupabaseServerClient()
+}
