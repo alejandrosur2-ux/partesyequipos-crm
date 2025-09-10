@@ -9,7 +9,7 @@ export default async function MachinesPage() {
 
   const { data: machines, error } = await supabase
     .from("machines")
-    .select("id, code, name, brand, model, serial, status, created_at")
+    .select("id, code, name, brand, model, serial, status, status_enum, created_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -40,7 +40,7 @@ export default async function MachinesPage() {
                 <td>{m.brand ?? "—"}</td>
                 <td>{m.model ?? "—"}</td>
                 <td>{m.serial ?? "—"}</td>
-                <td>{m.status ?? "—"}</td>
+                <td>{m.status_enum ?? m.status ?? "—"}</td>
                 <td className="text-right">
                   <Link href={`/machines/${m.id}`} className="underline mr-3">Ver</Link>
                   <Link href={`/machines/${m.id}/edit`} className="underline">Editar</Link>
