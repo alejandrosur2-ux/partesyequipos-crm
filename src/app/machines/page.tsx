@@ -1,58 +1,43 @@
-// src/app/machines/page.tsx
-import Link from "next/link";
-import { supabaseServer } from "@/lib/supabase/server";
+// arriba: imports iguales
 
-export const revalidate = 0; // evitar cache mientras arreglamos
+const PAGE_SIZE = 10;
 
-export default async function MachinesPage() {
-  const supabase = supabaseServer();
+async function safeFetchMachines({ q, status, page }: { q?: string; status?: string; page: number }) {
+  try {
+    const supabase = createSupabaseServerClient();
+    let query = supabase
+      .from('machines')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  const { data: machines, error } = await supabase
-    .from("machines")
-    .select("id, code, name, brand, model, serial, status, status_enum, created_at")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+    if (q && q.trim()) {
+      const like = `%${q}%`;
+      query = query.or(`code.ilike.${like},brand.ilike.${like},model.ilike.${like}`);
+    }
+    if (status) query = query.eq('status', status);
 
-  if (error) {
-    console.error("machines list error:", error);
-    throw new Error("Error al cargar máquinas");
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error, count } = await query.range(from, to);
+
+    if (error) {
+      console.error('Supabase error:', error.message);
+      return { rows: [], count: 0, err: error.message };
+    }
+    return { rows: data ?? [], count: count ?? 0, err: null };
+  } catch (e: any) {
+    console.error('Unhandled fetch error:', e?.message || e);
+    return { rows: [], count: 0, err: e?.message || 'unknown' };
   }
+}
 
-  return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Máquinas</h1>
-        <Link href="/machines/new" className="btn btn-primary">Nueva máquina</Link>
-      </div>
+export default async function MachinesPage({ searchParams }: { searchParams: { q?: string; status?: string; page?: string } }) {
+  const page = Number(searchParams.page ?? '1');
+  const { rows, count, err } = await safeFetchMachines({ q: searchParams.q, status: searchParams.status, page });
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-black/5 dark:bg-white/5">
-            <tr className="[&_th]:px-3 [&_th]:py-2 text-left">
-              <th>Nombre</th><th>Código</th><th>Marca</th><th>Modelo</th><th>Serie</th><th>Estado</th><th></th>
-            </tr>
-          </thead>
-          <tbody className="[&_td]:px-3 [&_td]:py-2">
-            {(machines ?? []).map((m) => (
-              <tr key={m.id} className="border-t">
-                <td>{m.name ?? "—"}</td>
-                <td>{m.code ?? "—"}</td>
-                <td>{m.brand ?? "—"}</td>
-                <td>{m.model ?? "—"}</td>
-                <td>{m.serial ?? "—"}</td>
-                <td>{m.status_enum ?? m.status ?? "—"}</td>
-                <td className="text-right">
-                  <Link href={`/machines/${m.id}`} className="underline mr-3">Ver</Link>
-                  <Link href={`/machines/${m.id}/edit`} className="underline">Editar</Link>
-                </td>
-              </tr>
-            ))}
-            {(!machines || machines.length === 0) && (
-              <tr><td colSpan={7} className="text-center py-6 opacity-70">Sin datos</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  // ...el resto del componente igual, pero antes del listado:
+  // muestra el error en UI en lugar de romper el render
+  // Inserta esto antes del <div className="grid gap-3">
+  // {err && <div className="card text-red-600 text-sm">Error cargando máquinas: {err}</div>}
 }
